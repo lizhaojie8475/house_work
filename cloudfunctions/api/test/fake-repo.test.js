@@ -23,6 +23,33 @@ describe('createFakeRepo', () => {
     });
   });
 
+  test('claimInactiveMember 只认领仍为非活跃状态的成员', async () => {
+    const repo = createFakeRepo({
+      members: [
+        { _id: 'm1', openid: 'openid-a', familyId: 'f1', active: false },
+        { _id: 'm2', openid: 'openid-b', familyId: 'f2', active: true },
+      ],
+    });
+    const { claimInactiveMember } = repo;
+
+    const claimed = await claimInactiveMember('m1', { familyId: 'f3', active: true });
+    expect(claimed).toMatchObject({ _id: 'm1', familyId: 'f3', active: true });
+    claimed.familyId = 'mutated-clone';
+    expect(repo._state.members[0].familyId).toBe('f3');
+    await expect(claimInactiveMember('m2', { familyId: 'f3' })).resolves.toBeNull();
+    await expect(claimInactiveMember('missing', { active: true })).resolves.toBeNull();
+  });
+
+  test('deleteFamily 返回是否实际删除了家庭', async () => {
+    const repo = createFakeRepo({
+      families: [{ _id: 'f1', inviteCode: 'ABC123' }],
+    });
+
+    await expect(repo.deleteFamily('f1')).resolves.toBe(true);
+    await expect(repo.deleteFamily('f1')).resolves.toBe(false);
+    expect(repo._state.families).toEqual([]);
+  });
+
   test('createChores 解构后仍可批量创建', async () => {
     const repo = createFakeRepo();
     const { createChores } = repo;

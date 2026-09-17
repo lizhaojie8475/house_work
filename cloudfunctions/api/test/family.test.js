@@ -118,6 +118,29 @@ describe('family.createOrGet', () => {
       message: expect.stringMatching(/[\u4e00-\u9fff]/),
     });
   });
+
+  test('非活跃成员被并发认领时删除新建家庭并抛中文 CONFLICT', async () => {
+    const inactiveMember = { ...ownerMember(), active: false, role: 'member' };
+    const repo = createFakeRepo({
+      families: [seededFamily()],
+      members: [inactiveMember],
+    });
+    const findMemberByOpenid = repo.findMemberByOpenid;
+    repo.findMemberByOpenid = async (openid) => {
+      const member = await findMemberByOpenid(openid);
+      await repo.updateMember(member._id, {
+        familyId: 'concurrent-family',
+        active: true,
+      });
+      return member;
+    };
+
+    await expect(call('family.createOrGet', repo, 'openid-a')).rejects.toMatchObject({
+      code: CODES.CONFLICT,
+      message: expect.stringMatching(/[\u4e00-\u9fff]/),
+    });
+    expect(repo._state.families.map((family) => family._id)).toEqual(['f1']);
+  });
 });
 
 describe('family.join', () => {
@@ -172,6 +195,35 @@ describe('family.join', () => {
       members: [{ ...ownerMember(), openid: 'openid-b' }],
     });
     repo.findMemberByOpenid = jest.fn().mockResolvedValueOnce(null);
+
+    await expect(
+      call('family.join', repo, 'openid-b', { inviteCode: 'ABC123' })
+    ).rejects.toMatchObject({
+      code: CODES.CONFLICT,
+      message: expect.stringMatching(/[\u4e00-\u9fff]/),
+    });
+  });
+
+  test('非活跃成员被并发认领时抛中文 CONFLICT', async () => {
+    const inactiveMember = {
+      ...ownerMember(),
+      openid: 'openid-b',
+      active: false,
+      role: 'member',
+    };
+    const repo = createFakeRepo({
+      families: [seededFamily()],
+      members: [inactiveMember],
+    });
+    const findMemberByOpenid = repo.findMemberByOpenid;
+    repo.findMemberByOpenid = async (openid) => {
+      const member = await findMemberByOpenid(openid);
+      await repo.updateMember(member._id, {
+        familyId: 'concurrent-family',
+        active: true,
+      });
+      return member;
+    };
 
     await expect(
       call('family.join', repo, 'openid-b', { inviteCode: 'ABC123' })

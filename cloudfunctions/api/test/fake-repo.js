@@ -49,6 +49,12 @@ function createFakeRepo(seed = {}) {
       if (!doc) return null;
       return clone(patchDoc(doc, patch));
     },
+    async deleteFamily(id) {
+      const idx = state.families.findIndex((f) => f._id === id);
+      if (idx === -1) return false;
+      state.families.splice(idx, 1);
+      return true;
+    },
     async findFamilyByInviteCode(code) {
       return clone(state.families.find((f) => f.inviteCode === code) || null);
     },
@@ -77,6 +83,12 @@ function createFakeRepo(seed = {}) {
     },
     async updateMember(id, patch) {
       const doc = state.members.find((m) => m._id === id);
+      if (!doc) return null;
+      return clone(patchDoc(doc, patch));
+    },
+    // 模拟 CloudBase where({ _id, active: false }).update() 的原子条件更新语义。
+    async claimInactiveMember(id, patch) {
+      const doc = state.members.find((m) => m._id === id && m.active === false);
       if (!doc) return null;
       return clone(patchDoc(doc, patch));
     },

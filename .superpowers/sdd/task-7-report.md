@@ -195,3 +195,68 @@ $ git diff --check
 ```
 
 IDE 诊断：4 个变更的 JavaScript 文件均无 linter 错误。
+
+## 非活跃成员并发认领修复（2026-09-17）
+
+### 变更与原因
+
+- 在 fake repository 中新增原子条件认领语义：只有成员仍为 `active: false` 时才应用 patch 并返回深拷贝，否则返回 `null`；该行为对应后续真实 CloudBase repository 必须实现的 `where({ _id, active: false }).update()`。
+- `family.join` 和 `family.createOrGet` 的非活跃成员复用分支改为条件认领；认领失败统一通过 `appError(CODES.CONFLICT, '操作太快了，请重新进入小程序重试')` 返回中文冲突。
+- `family.createOrGet` 认领失败时补偿删除刚创建的家庭；删除异常只写日志，不覆盖原始 `CONFLICT`，避免留下孤儿家庭或向用户暴露非业务错误。
+- 新增 fake repository、两条 action 竞态和邀请码易混淆字符排除测试。竞态测试通过在查询与 claim 之间用 repository 的真实更新行为抢先激活成员来复现，没有直接 stub `claimInactiveMember`。
+
+### 新增 repository 方法契约
+
+- `claimInactiveMember(memberId, patch): Promise<member | null>`
+- `deleteFamily(familyId): Promise<boolean>`
+
+### 测试命令与输出
+
+修改前基线：
+
+```text
+$ npx jest cloudfunctions/api
+Test Suites: 6 passed, 6 total
+Tests:       64 passed, 64 total
+
+$ npm test
+Test Suites: 10 passed, 10 total
+Tests:       153 passed, 153 total
+```
+
+新增测试后的 RED：
+
+```text
+$ npx jest cloudfunctions/api/test/fake-repo.test.js cloudfunctions/api/test/family.test.js cloudfunctions/api/test/invite.test.js
+Test Suites: 2 failed, 1 passed, 3 total
+Tests:       4 failed, 39 passed, 43 total
+```
+
+实现后的聚焦 GREEN：
+
+```text
+$ npx jest cloudfunctions/api/test/fake-repo.test.js cloudfunctions/api/test/family.test.js cloudfunctions/api/test/invite.test.js
+Test Suites: 3 passed, 3 total
+Tests:       43 passed, 43 total
+```
+
+最终完整验证：
+
+```text
+$ npx jest cloudfunctions/api
+Test Suites: 6 passed, 6 total
+Tests:       69 passed, 69 total
+
+$ npm test
+Test Suites: 10 passed, 10 total
+Tests:       158 passed, 158 total
+
+$ git diff --check
+（无输出，退出码 0）
+```
+
+IDE 诊断：本次修改的 5 个 JavaScript 文件均无 linter 错误。
+
+### Concerns
+
+无。

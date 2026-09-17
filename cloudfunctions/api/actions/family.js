@@ -11,13 +11,14 @@ const DEFAULT_FAMILY_NAME = '我的家';
 const ALLOWED_REMINDER_HOURS = [7, 8, 20];
 const DEFAULT_SETTINGS = { reminderHour: 8, defaultReminderLeadDays: 1 };
 const MAX_INVITE_CODE_ATTEMPTS = 5;
+const CONCURRENT_CONFLICT_MESSAGE = '操作太快了，请重新进入小程序重试';
 
 async function insertOrConflict(insert) {
   try {
     return await insert();
   } catch (err) {
     if (isDuplicateKeyError(err)) {
-      throw appError(CODES.CONFLICT, '操作太快了，请重新进入小程序重试');
+      throw appError(CODES.CONFLICT, CONCURRENT_CONFLICT_MESSAGE);
     }
     throw err;
   }
@@ -59,25 +60,39 @@ async function createOrGet({ openid, payload, repo, random }) {
       createdAt: now,
     })
   );
-  const member = existing
-    ? await repo.updateMember(existing._id, {
+  let member;
+  if (existing) {
+    member = await repo.claimInactiveMember(existing._id, {
+      familyId: family._id,
+      role: 'owner',
+      active: true,
+      joinedAt: now,
+    });
+    if (!member) {
+      try {
+        const deleted = await repo.deleteFamily(family._id);
+        if (!deleted) {
+          console.error('并发认领成员失败后未找到待删除家庭', family._id);
+        }
+      } catch (err) {
+        console.error('并发认领成员失败后删除家庭异常', family._id, err);
+      }
+      throw appError(CODES.CONFLICT, CONCURRENT_CONFLICT_MESSAGE);
+    }
+  } else {
+    member = await insertOrConflict(() =>
+      repo.createMember({
         familyId: family._id,
+        openid,
+        nickname: payload.nickname || '我',
+        avatarUrl: payload.avatarUrl || '',
         role: 'owner',
-        active: true,
+        subscribeQuota: 0,
         joinedAt: now,
+        active: true,
       })
-    : await insertOrConflict(() =>
-        repo.createMember({
-          familyId: family._id,
-          openid,
-          nickname: payload.nickname || '我',
-          avatarUrl: payload.avatarUrl || '',
-          role: 'owner',
-          subscribeQuota: 0,
-          joinedAt: now,
-          active: true,
-        })
-      );
+    );
+  }
   return { family, member, members: [member] };
 }
 
@@ -101,25 +116,31 @@ async function join({ openid, payload, repo }) {
   }
 
   const now = Date.now();
-  const member = existing
-    ? await repo.updateMember(existing._id, {
+  let member;
+  if (existing) {
+    member = await repo.claimInactiveMember(existing._id, {
+      familyId: family._id,
+      role: 'member',
+      active: true,
+      joinedAt: now,
+    });
+    if (!member) {
+      throw appError(CODES.CONFLICT, CONCURRENT_CONFLICT_MESSAGE);
+    }
+  } else {
+    member = await insertOrConflict(() =>
+      repo.createMember({
         familyId: family._id,
+        openid,
+        nickname: payload.nickname || '家人',
+        avatarUrl: payload.avatarUrl || '',
         role: 'member',
-        active: true,
+        subscribeQuota: 0,
         joinedAt: now,
+        active: true,
       })
-    : await insertOrConflict(() =>
-        repo.createMember({
-          familyId: family._id,
-          openid,
-          nickname: payload.nickname || '家人',
-          avatarUrl: payload.avatarUrl || '',
-          role: 'member',
-          subscribeQuota: 0,
-          joinedAt: now,
-          active: true,
-        })
-      );
+    );
+  }
   return { family, member };
 }
 

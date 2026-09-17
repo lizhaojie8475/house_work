@@ -36,6 +36,14 @@ describe('generateInviteCode', () => {
     const codes = new Set([generateInviteCode(random), generateInviteCode(random)]);
     expect(codes.size).toBeGreaterThan(1);
   });
+
+  test('邀请码字符表排除容易混淆的 0、O、1、I', () => {
+    const values = Array.from({ length: 36 }, (_, index) => (index + 0.5) / 36);
+    const random = () => values.shift();
+    const generated = Array.from({ length: 6 }, () => generateInviteCode(random)).join('');
+
+    expect(generated).not.toMatch(/[0O1I]/);
+  });
 });
 
 describe('isInviteCodeValid', () => {

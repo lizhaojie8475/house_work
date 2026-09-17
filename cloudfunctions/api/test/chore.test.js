@@ -128,7 +128,67 @@ describe('chore.create', () => {
         intervalDays: 3,
         initialLastDoneKey: '2026/09/01',
       })
-    ).rejects.toMatchObject({ code: CODES.INVALID_ARGUMENT });
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '上次完成日格式应为 2026-09-17',
+    });
+  });
+
+  test.each(['2026-02-31', '2026-13-01', '2026-02-29'])(
+    '上次完成日 %s 不是有效日期时抛中文 INVALID_ARGUMENT',
+    async (initialLastDoneKey) => {
+      const repo = baseRepo();
+      await expect(
+        call('chore.create', repo, 'openid-a', {
+          name: 'x',
+          scheduleType: 'floating',
+          intervalDays: 3,
+          initialLastDoneKey,
+        })
+      ).rejects.toMatchObject({
+        code: CODES.INVALID_ARGUMENT,
+        message: '上次完成日不是有效的日历日期',
+      });
+    }
+  );
+
+  test('有效闰日 2028-02-29 可作为上次完成日', async () => {
+    const repo = baseRepo();
+    const res = await call('chore.create', repo, 'openid-a', {
+      name: 'x',
+      scheduleType: 'floating',
+      intervalDays: 3,
+      initialLastDoneKey: '2028-02-29',
+    });
+    expect(res.chore.nextDueAt).toBe('2028-03-03');
+  });
+
+  test('非法固定周期抛不含英文诊断的中文 INVALID_ARGUMENT', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const repo = baseRepo();
+    await expect(
+      call('chore.create', repo, 'openid-a', {
+        name: 'x',
+        scheduleType: 'fixed',
+        fixedRule: { type: 'weekly', weekdays: [7] },
+      })
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '周期设置有误，请检查星期、日期和月份设置',
+    });
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  test('固定周期按稳定字段顺序存储并排序星期', async () => {
+    const repo = baseRepo();
+    const res = await call('chore.create', repo, 'openid-a', {
+      name: 'x',
+      scheduleType: 'fixed',
+      fixedRule: { weekdays: [4, 2], type: 'weekly' },
+      initialLastDoneKey: '2026-09-13',
+    });
+    expect(res.chore.fixedRule).toEqual({ type: 'weekly', weekdays: [2, 4] });
   });
 
   test('非成员抛 FORBIDDEN', async () => {
@@ -220,6 +280,16 @@ describe('chore.list', () => {
     expect(res.chores.map((c) => c._id)).toEqual(['c2']);
   });
 
+  test.each(['false', 0, null])('archived 为非布尔值 %p 时抛中文 INVALID_ARGUMENT', async (archived) => {
+    const repo = baseRepo();
+    await expect(
+      call('chore.list', repo, 'openid-a', { archived })
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '归档状态必须是布尔值',
+    });
+  });
+
   test('可按房间筛选', async () => {
     const repo = baseRepo({
       chores: [
@@ -229,6 +299,16 @@ describe('chore.list', () => {
     });
     const res = await call('chore.list', repo, 'openid-a', { room: '厨房' });
     expect(res.chores.map((c) => c._id)).toEqual(['c2']);
+  });
+
+  test('房间筛选为非字符串时抛中文 INVALID_ARGUMENT', async () => {
+    const repo = baseRepo();
+    await expect(
+      call('chore.list', repo, 'openid-a', { room: 1 })
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '房间筛选必须是文本',
+    });
   });
 
   test('不返回其他家庭的家务', async () => {
@@ -319,6 +399,23 @@ describe('chore.update', () => {
     expect(res.chore.nextDueAt).toBe('2026-09-20');
   });
 
+  test('仅调整每周日期顺序不视为周期变更', async () => {
+    const repo = baseRepo({
+      chores: [
+        choreDoc({
+          scheduleType: 'fixed',
+          intervalDays: null,
+          fixedRule: { type: 'weekly', weekdays: [2, 4] },
+        }),
+      ],
+    });
+    const res = await call('chore.update', repo, 'openid-a', {
+      choreId: 'c1',
+      fixedRule: { weekdays: [4, 2], type: 'weekly' },
+    });
+    expect(res.chore.nextDueAt).toBe('2026-09-20');
+  });
+
   test('跨家庭修改抛 FORBIDDEN', async () => {
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
     await expect(
@@ -350,6 +447,9 @@ describe('chore.setArchived', () => {
     const repo = baseRepo({ chores: [choreDoc()] });
     await expect(
       call('chore.setArchived', repo, 'openid-a', { choreId: 'c1', archived: 'yes' })
-    ).rejects.toMatchObject({ code: CODES.INVALID_ARGUMENT });
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '归档状态必须是布尔值',
+    });
   });
 });

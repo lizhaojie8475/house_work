@@ -83,8 +83,14 @@ async function batchCreate({ openid, payload, repo }) {
 
 async function list({ openid, payload, repo }) {
   const member = await requireMember(repo, openid);
+  if (payload.archived !== undefined && typeof payload.archived !== 'boolean') {
+    throw appError(CODES.INVALID_ARGUMENT, '归档状态必须是布尔值');
+  }
+  if (payload.room !== undefined && typeof payload.room !== 'string') {
+    throw appError(CODES.INVALID_ARGUMENT, '房间筛选必须是文本');
+  }
   const chores = await repo.listChores(member.familyId, {
-    archived: Boolean(payload.archived),
+    archived: payload.archived === undefined ? false : payload.archived,
     room: payload.room || null,
   });
   const today = todayKey();

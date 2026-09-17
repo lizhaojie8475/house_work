@@ -1,5 +1,6 @@
 const { appError, CODES } = require('./errors');
 const { computeNextDueAt } = require('./schedule');
+const { parseDateKey, daysInMonth } = require('./date');
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -18,6 +19,34 @@ function optionalInt(value, field, min, max, fallback) {
     throw appError(CODES.INVALID_ARGUMENT, `${field}需为 ${min} 到 ${max} 之间的整数`);
   }
   return value;
+}
+
+function isValidDateKey(key) {
+  const { y, m, d } = parseDateKey(key);
+  return y >= 1 && m >= 1 && m <= 12 && d >= 1 && d <= daysInMonth(y, m);
+}
+
+function canonicalizeFixedRule(rule) {
+  if (!rule || typeof rule !== 'object') return rule || null;
+  if (rule.type === 'weekly') {
+    return {
+      type: rule.type,
+      weekdays: Array.isArray(rule.weekdays)
+        ? [...rule.weekdays].sort((a, b) => a - b)
+        : rule.weekdays,
+    };
+  }
+  if (rule.type === 'monthly') {
+    return { type: rule.type, dayOfMonth: rule.dayOfMonth };
+  }
+  if (rule.type === 'yearly') {
+    return {
+      type: rule.type,
+      month: rule.month,
+      dayOfMonth: rule.dayOfMonth,
+    };
+  }
+  return { type: rule.type };
 }
 
 // 归一化并校验家务输入。校验通过意味着 computeNextDueAt 一定不会抛错。
@@ -53,13 +82,16 @@ function normalizeChoreInput(raw, { defaultReminderLeadDays }) {
     }
     normalized.intervalDays = days;
   } else {
-    normalized.fixedRule = raw.fixedRule || null;
+    normalized.fixedRule = canonicalizeFixedRule(raw.fixedRule);
   }
 
   if (raw.initialLastDoneKey) {
     const key = String(raw.initialLastDoneKey);
     if (!DATE_KEY_RE.test(key)) {
       throw appError(CODES.INVALID_ARGUMENT, '上次完成日格式应为 2026-09-17');
+    }
+    if (!isValidDateKey(key)) {
+      throw appError(CODES.INVALID_ARGUMENT, '上次完成日不是有效的日历日期');
     }
     normalized.initialLastDoneKey = key;
   }
@@ -68,7 +100,8 @@ function normalizeChoreInput(raw, { defaultReminderLeadDays }) {
   try {
     computeNextDueAt(normalized, '2026-01-01');
   } catch (err) {
-    throw appError(CODES.INVALID_ARGUMENT, `周期设置有误：${err.message}`);
+    console.error('家务周期配置校验失败', err);
+    throw appError(CODES.INVALID_ARGUMENT, '周期设置有误，请检查星期、日期和月份设置');
   }
 
   return normalized;

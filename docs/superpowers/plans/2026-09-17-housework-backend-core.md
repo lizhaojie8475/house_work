@@ -1567,7 +1567,7 @@ module.exports = {};
 
 ```js
 // repository 的内存实现，供 action 单元测试使用。
-// 方法签名必须与 cloudfunctions/api/lib/repo.js（Task 11）严格一致。
+// 方法签名必须与 shared/repo.js（Task 11）严格一致。
 let seq = 0;
 function nextId(prefix) {
   seq += 1;
@@ -3576,14 +3576,18 @@ git commit -m "feat: 实现成员资料更新、订阅额度上报与个人信�
 本任务把前面全部用假 repo 测过的 action 接到真实云数据库上。repo 的每个方法签名必须与 `test/fake-repo.js` 严格一致，否则单元测试的保障会失效。
 
 **Files:**
-- Create: `cloudfunctions/api/lib/repo.js`
+- Create: `shared/repo.js`
 - Create: `cloudfunctions/api/index.js`
+- Modify: `scripts/sync-shared.js`
+- Modify: `scripts/sync-shared.test.js`
 - Test: `cloudfunctions/api/test/repo-contract.test.js`
+
+repo 实现同时被 `api` 与 `reminder` 两个云函数使用，因此它属于 `shared/`，由同步脚本分发，而不是放在某一个云函数下再被另一个跨目录引用。
 
 **Interfaces:**
 - Consumes: `test/fake-repo.js` 的 `createFakeRepo`（仅用于契约对比）
 - Produces:
-  - `lib/repo.js`：`COLLECTIONS: { FAMILIES: 'families', MEMBERS: 'members', CHORES: 'chores', LOGS: 'chore_logs', REMINDER_SENDS: 'reminder_sends' }`、`createRepo(db, command): repo`
+  - `shared/repo.js`：`COLLECTIONS: { FAMILIES: 'families', MEMBERS: 'members', CHORES: 'chores', LOGS: 'chore_logs', REMINDER_SENDS: 'reminder_sends' }`、`createRepo(db, command): repo`。同步后云函数通过 `./lib/repo` 引用
   - `index.js`：`exports.main`，用 `wx-server-sdk` 装配 `createRouter`
 
 - [ ] **Step 1: 写失败的契约测试**
@@ -3593,7 +3597,7 @@ git commit -m "feat: 实现成员资料更新、订阅额度上报与个人信�
 创建 `cloudfunctions/api/test/repo-contract.test.js`：
 
 ```js
-const { createRepo, COLLECTIONS } = require('../lib/repo');
+const { createRepo, COLLECTIONS } = require('../../../shared/repo');
 const { createFakeRepo } = require('./fake-repo');
 
 // 极简 db 桩，只需让 createRepo 能构造出对象，不执行任何查询
@@ -3645,11 +3649,11 @@ describe('repo 契约', () => {
 - [ ] **Step 2: 运行测试确认失败**
 
 Run: `npx jest cloudfunctions/api/test/repo-contract.test.js`
-Expected: FAIL，报错 `Cannot find module '../lib/repo'`
+Expected: FAIL，报错 `Cannot find module '../../../shared/repo'`
 
 - [ ] **Step 3: 实现云数据库 repo**
 
-创建 `cloudfunctions/api/lib/repo.js`：
+创建 `shared/repo.js`：
 
 ```js
 // repository 层。所有云数据库访问都收敛在这里，
@@ -3799,6 +3803,33 @@ module.exports = { COLLECTIONS, createRepo };
 
 `stubDb` 的 `collection()` 未提供 `remove`，而 `deleteLog` 会用到。契约测试只比较方法集合、不调用方法，因此不受影响。
 
+- [ ] **Step 4: 把 repo.js 加入同步清单**
+
+修改 `scripts/sync-shared.js`，把 `ALL_FILES` 一行替换为：
+
+```js
+const ALL_FILES = ['date.js', 'schedule.js', 'urgency.js', 'repo.js'];
+```
+
+修改 `scripts/sync-shared.test.js`，把云函数文件清单那条用例替换为：
+
+```js
+  test('云函数拿到完整四个文件', () => {
+    expect(TARGETS[0].files).toEqual(['date.js', 'schedule.js', 'urgency.js', 'repo.js']);
+    expect(TARGETS[1].files).toEqual(['date.js', 'schedule.js', 'urgency.js', 'repo.js']);
+  });
+```
+
+Run: `npm run sync:shared`
+Expected: 输出
+```
+synced 4 file(s) -> cloudfunctions/api/lib
+synced 4 file(s) -> cloudfunctions/reminder/lib
+synced 2 file(s) -> miniprogram/utils/shared
+```
+
+- [ ] **Step 5: 实现云函数入口**
+
 创建 `cloudfunctions/api/index.js`：
 
 ```js
@@ -3823,20 +3854,20 @@ const handle = createRouter({
 exports.main = (event) => handle(event);
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [ ] **Step 6: 运行测试确认通过**
 
 Run: `npx jest cloudfunctions/api`
 Expected: PASS，`Tests: 107 passed`
 
-- [ ] **Step 5: 全量回归**
+- [ ] **Step 7: 全量回归**
 
 Run: `npm test`
 Expected: PASS，所有测试套件通过
 
-- [ ] **Step 6: 提交**
+- [ ] **Step 8: 提交**
 
 ```bash
-git add cloudfunctions/api
+git add -A
 git commit -m "feat: 实现云数据库 repository 与 api 云函数入口"
 ```
 
@@ -4391,7 +4422,7 @@ describe('runReminderScan', () => {
 - [ ] **Step 2: 同步共享代码到 reminder 云函数**
 
 Run: `npm run sync:shared`
-Expected: 输出包含 `synced 3 file(s) -> cloudfunctions/reminder/lib`
+Expected: 输出包含 `synced 4 file(s) -> cloudfunctions/reminder/lib`
 
 - [ ] **Step 3: 运行测试确认失败**
 
@@ -4555,7 +4586,7 @@ cron 为七位（秒 分 时 日 月 周 年），`0 0 * * * * *` 表示每小�
 
 ```js
 const cloud = require('wx-server-sdk');
-const { createRepo } = require('../api/lib/repo');
+const { createRepo } = require('./lib/repo');
 const { runReminderScan } = require('./lib/scan');
 const { TEMPLATE_ID } = require('./lib/message');
 
@@ -4589,59 +4620,12 @@ exports.main = async () => {
 };
 ```
 
-`index.js` 用相对路径 `require('../api/lib/repo')` 只是为了在本地保持单一实现；云函数上传时不会带上同级目录。**部署前必须执行 Step 8 的复制步骤。**
-
-- [ ] **Step 8: 把 repo 实现纳入同步清单**
-
-repo 实现同时被两个云函数使用，因此它也必须走同步机制而不是相对路径引用。
-
-先把文件移到共享目录：
-
-```bash
-git mv cloudfunctions/api/lib/repo.js shared/repo.js
-```
-
-修改 `scripts/sync-shared.js`，把 `ALL_FILES` 一行替换为：
-
-```js
-const ALL_FILES = ['date.js', 'schedule.js', 'urgency.js', 'repo.js'];
-```
-
-修改 `scripts/sync-shared.test.js` 中两条断言，把云函数的期望文件列表改为：
-
-```js
-  test('云函数拿到完整四个文件', () => {
-    expect(TARGETS[0].files).toEqual(['date.js', 'schedule.js', 'urgency.js', 'repo.js']);
-    expect(TARGETS[1].files).toEqual(['date.js', 'schedule.js', 'urgency.js', 'repo.js']);
-  });
-```
-
-修改 `cloudfunctions/reminder/index.js` 第二行，改为从本目录引用：
-
-```js
-const { createRepo } = require('./lib/repo');
-```
-
-修改 `cloudfunctions/api/test/repo-contract.test.js` 首行，改为：
-
-```js
-const { createRepo, COLLECTIONS } = require('../../../shared/repo');
-```
-
-Run: `npm run sync:shared`
-Expected: 输出
-```
-synced 4 file(s) -> cloudfunctions/api/lib
-synced 4 file(s) -> cloudfunctions/reminder/lib
-synced 2 file(s) -> miniprogram/utils/shared
-```
-
-- [ ] **Step 9: 全量回归**
+- [ ] **Step 8: 全量回归**
 
 Run: `npm test`
 Expected: PASS，所有测试套件通过，`Tests: 230 passed`
 
-- [ ] **Step 10: 提交**
+- [ ] **Step 9: 提交**
 
 ```bash
 git add -A

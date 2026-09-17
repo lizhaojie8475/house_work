@@ -103,3 +103,23 @@
 
 - 修改前：`npx jest cloudfunctions/api` → 111 passed；`npm test` → 200 passed。
 - 修改后：`npx jest cloudfunctions/api` → 112 passed；`npm test` → 201 passed。
+
+## 输入边界与测试噪声修复（2026-09-17）
+
+### 逐项修复
+
+1. 路由 payload：在单入口将 `null`、字符串、数字、布尔值等非对象 payload 统一归一化为 `{}`，再传给 handler；保留 action 自有属性检查、业务错误标记识别、错误码自有属性检查及依赖调用位置。
+2. 批量项：在 `normalizeChoreInput` 顶部拒绝 `null`、非对象和数组，通过 `appError(INVALID_ARGUMENT, '每件家务都需要填写完整信息')` 返回可展示中文消息。守卫放在公共 normaliser，可同时保护 create、update、batchCreate；batchCreate 仍先完成全部 `map` 校验再统一写入，因此合法项后出现 `null` 也不会留下部分数据。
+3. 控制台噪声：三个跨家庭测试均临时 stub `console.error`、断言审计日志确实写入，并在 `finally` 恢复；固定周期错误测试也改用 `try/finally`，避免断言中途失败后泄漏 stub。
+4. 消息断言：缺少名称、非法 `scheduleType` 和批量项非法测试均断言具体、可直接展示且不含 ASCII 字母的中文消息。
+
+### 测试与输出
+
+- 修改前：`npx jest cloudfunctions/api` → 7 suites passed，112 tests passed；输出包含 3 段预期的跨家庭 `console.error` 噪声。
+- 修改前仓库基线（任务提供）：`npm test` → 11 suites passed，201 tests passed。
+- RED：`npx jest cloudfunctions/api/test/router.test.js cloudfunctions/api/test/chore.test.js` → 2 suites failed，6 tests failed、61 tests passed；失败均对应 payload 未归一化和嵌套项未走业务错误通道。
+- GREEN：`npx jest cloudfunctions/api/test/router.test.js cloudfunctions/api/test/chore.test.js` → 2 suites passed，67 tests passed。
+- 修改后：`npx jest cloudfunctions/api` → 7 suites passed，118 tests passed。
+- 修改后：`npm test` → 11 suites passed，207 tests passed。
+- 两次修改后完整 Jest 输出均无 stray `console.error`、warning 或 error 噪声。
+- IDE lint：四个变更代码文件均无诊断错误；`git diff --check` 通过。

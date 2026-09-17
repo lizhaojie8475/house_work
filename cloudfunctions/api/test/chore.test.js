@@ -109,14 +109,20 @@ describe('chore.create', () => {
     const repo = baseRepo();
     await expect(
       call('chore.create', repo, 'openid-a', { scheduleType: 'floating', intervalDays: 3 })
-    ).rejects.toMatchObject({ code: CODES.INVALID_ARGUMENT });
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '家务名称不能为空',
+    });
   });
 
   test('非法周期类型抛 INVALID_ARGUMENT', async () => {
     const repo = baseRepo();
     await expect(
       call('chore.create', repo, 'openid-a', { name: 'x', scheduleType: 'daily' })
-    ).rejects.toMatchObject({ code: CODES.INVALID_ARGUMENT });
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '周期类型只能是浮动周期或固定日历',
+    });
   });
 
   test('上次完成日格式非法抛 INVALID_ARGUMENT', async () => {
@@ -192,19 +198,22 @@ describe('chore.create', () => {
 
   test('非法固定周期抛不含英文诊断的中文 INVALID_ARGUMENT', async () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const repo = baseRepo();
-    await expect(
-      call('chore.create', repo, 'openid-a', {
-        name: 'x',
-        scheduleType: 'fixed',
-        fixedRule: { type: 'weekly', weekdays: [7] },
-      })
-    ).rejects.toMatchObject({
-      code: CODES.INVALID_ARGUMENT,
-      message: '周期设置有误，请检查星期、日期和月份设置',
-    });
-    expect(errorSpy).toHaveBeenCalled();
-    errorSpy.mockRestore();
+    try {
+      const repo = baseRepo();
+      await expect(
+        call('chore.create', repo, 'openid-a', {
+          name: 'x',
+          scheduleType: 'fixed',
+          fixedRule: { type: 'weekly', weekdays: [7] },
+        })
+      ).rejects.toMatchObject({
+        code: CODES.INVALID_ARGUMENT,
+        message: '周期设置有误，请检查星期、日期和月份设置',
+      });
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   test('固定周期按稳定字段顺序存储并排序星期', async () => {
@@ -260,7 +269,36 @@ describe('chore.batchCreate', () => {
           { name: '', scheduleType: 'floating', intervalDays: 7 },
         ],
       })
-    ).rejects.toMatchObject({ code: CODES.INVALID_ARGUMENT });
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '家务名称不能为空',
+    });
+    expect(repo._state.chores).toHaveLength(0);
+  });
+
+  test.each([null, 'x'])('非对象批量项 %p 抛中文 INVALID_ARGUMENT', async (item) => {
+    const repo = baseRepo();
+    await expect(
+      call('chore.batchCreate', repo, 'openid-a', { items: [item] })
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '每件家务都需要填写完整信息',
+    });
+  });
+
+  test('合法项后有 null 时整批失败且不写入数据', async () => {
+    const repo = baseRepo();
+    await expect(
+      call('chore.batchCreate', repo, 'openid-a', {
+        items: [
+          { name: '合法', scheduleType: 'floating', intervalDays: 7 },
+          null,
+        ],
+      })
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '每件家务都需要填写完整信息',
+    });
     expect(repo._state.chores).toHaveLength(0);
   });
 
@@ -363,13 +401,20 @@ describe('chore.get', () => {
   });
 
   test('跨家庭访问返回 NOT_FOUND，不泄露 id 是否存在', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
-    await expect(
-      call('chore.get', repo, 'openid-a', { choreId: 'c9' })
-    ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
+    try {
+      await expect(
+        call('chore.get', repo, 'openid-a', { choreId: 'c9' })
+      ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   test('不存在与跨家庭拒绝的 code 与 message 完全一致', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
     const capture = async (choreId) => {
       try {
@@ -380,10 +425,15 @@ describe('chore.get', () => {
         return err;
       }
     };
-    const missing = await capture('nope');
-    const crossFamily = await capture('c9');
-    expect(crossFamily.code).toEqual(missing.code);
-    expect(crossFamily.message).toEqual(missing.message);
+    try {
+      const missing = await capture('nope');
+      const crossFamily = await capture('c9');
+      expect(crossFamily.code).toEqual(missing.code);
+      expect(crossFamily.message).toEqual(missing.message);
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
 
@@ -461,10 +511,16 @@ describe('chore.update', () => {
   });
 
   test('跨家庭修改返回 NOT_FOUND，不泄露 id 是否存在', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
-    await expect(
-      call('chore.update', repo, 'openid-a', { choreId: 'c9', name: 'x' })
-    ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
+    try {
+      await expect(
+        call('chore.update', repo, 'openid-a', { choreId: 'c9', name: 'x' })
+      ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
 

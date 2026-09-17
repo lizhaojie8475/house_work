@@ -51,6 +51,9 @@ function canonicalizeFixedRule(rule) {
 
 // 归一化并校验家务输入。校验通过意味着 computeNextDueAt 一定不会抛错。
 function normalizeChoreInput(raw, { defaultReminderLeadDays }) {
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw appError(CODES.INVALID_ARGUMENT, '每件家务都需要填写完整信息');
+  }
   const scheduleType = raw.scheduleType;
   if (scheduleType !== 'floating' && scheduleType !== 'fixed') {
     throw appError(CODES.INVALID_ARGUMENT, '周期类型只能是浮动周期或固定日历');

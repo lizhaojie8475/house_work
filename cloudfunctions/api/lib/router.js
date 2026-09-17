@@ -8,7 +8,9 @@ function createRouter({ actions, getOpenid, getRepo, logger = console }) {
     if (event == null || typeof event !== 'object') {
       event = {};
     }
-    const { action, payload = {} } = event;
+    const { action } = event;
+    const payload =
+      event.payload != null && typeof event.payload === 'object' ? event.payload : {};
     const handler = hasOwn(actions, action) ? actions[action] : undefined;
     if (typeof handler !== 'function') {
       return { ok: false, code: CODES.UNKNOWN_ACTION, message: `未知操作：${action}` };

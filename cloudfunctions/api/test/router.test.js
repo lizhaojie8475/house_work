@@ -72,6 +72,19 @@ describe('createRouter', () => {
     expect(seen).toEqual({});
   });
 
+  test.each([null, 'x', 42])('payload 为非对象 %p 时传空对象给 handler', async (payload) => {
+    let seen;
+    const handle = build({
+      'ping.do': async ({ payload: received }) => {
+        seen = received;
+        return { accepted: true };
+      },
+    });
+    const res = await handle({ action: 'ping.do', payload });
+    expect(seen).toEqual({});
+    expect(res).toEqual({ ok: true, data: { accepted: true } });
+  });
+
   test('handler 收到 openid', async () => {
     let seen;
     const handle = build({

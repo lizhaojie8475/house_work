@@ -1,0 +1,22 @@
+{
+  "name": "house-work",
+  "version": "1.0.0",
+  "private": true,
+  "description": "家务管家微信小程序",
+  "scripts": {
+    "test": "jest",
+    "sync:shared": "node scripts/sync-shared.js"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/cloudfunctions/.+/lib/",
+      "/miniprogram/utils/shared/",
+      "/miniprogram/miniprogram_npm/"
+    ]
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

@@ -1,6 +1,6 @@
 const { appError, CODES } = require('./errors');
 const { computeNextDueAt } = require('./schedule');
-const { parseDateKey, daysInMonth } = require('./date');
+const { parseDateKey, daysInMonth, todayKey } = require('./date');
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -92,6 +92,9 @@ function normalizeChoreInput(raw, { defaultReminderLeadDays }) {
     }
     if (!isValidDateKey(key)) {
       throw appError(CODES.INVALID_ARGUMENT, '上次完成日不是有效的日历日期');
+    }
+    if (key > todayKey()) {
+      throw appError(CODES.INVALID_ARGUMENT, '上次完成日不能晚于今天');
     }
     normalized.initialLastDoneKey = key;
   }

@@ -152,15 +152,42 @@ describe('chore.create', () => {
     }
   );
 
-  test('有效闰日 2028-02-29 可作为上次完成日', async () => {
+  test('有效闰日 2024-02-29 可作为上次完成日', async () => {
     const repo = baseRepo();
     const res = await call('chore.create', repo, 'openid-a', {
       name: 'x',
       scheduleType: 'floating',
       intervalDays: 3,
-      initialLastDoneKey: '2028-02-29',
+      initialLastDoneKey: '2024-02-29',
     });
-    expect(res.chore.nextDueAt).toBe('2028-03-03');
+    expect(res.chore.nextDueAt).toBe('2024-03-03');
+  });
+
+  test('上次完成日晚于今天抛 INVALID_ARGUMENT', async () => {
+    const repo = baseRepo();
+    await expect(
+      call('chore.create', repo, 'openid-a', {
+        name: 'x',
+        scheduleType: 'floating',
+        intervalDays: 3,
+        initialLastDoneKey: addDays(todayKey(), 1),
+      })
+    ).rejects.toMatchObject({
+      code: CODES.INVALID_ARGUMENT,
+      message: '上次完成日不能晚于今天',
+    });
+  });
+
+  test('上次完成日为今天时可创建', async () => {
+    const repo = baseRepo();
+    const today = todayKey();
+    const res = await call('chore.create', repo, 'openid-a', {
+      name: 'x',
+      scheduleType: 'floating',
+      intervalDays: 3,
+      initialLastDoneKey: today,
+    });
+    expect(res.chore.nextDueAt).toBe(addDays(today, 3));
   });
 
   test('非法固定周期抛不含英文诊断的中文 INVALID_ARGUMENT', async () => {

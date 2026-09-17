@@ -79,3 +79,15 @@
 - 修改后：`npm test` → 11 suites passed，198 tests passed。
 - IDE lint：三个变更代码文件均无诊断错误。
 - `git diff --check`：通过，无输出。
+
+## initialLastDoneKey 未来日期修正（2026-09-17）
+
+### 变更
+
+- `chore-input.js`：在真实日历日校验通过后，用 `YYYY-MM-DD` 字符串与 `todayKey()` 比较，拒绝严格晚于今天的 `initialLastDoneKey`（今天仍接受）；错误为 `INVALID_ARGUMENT`，文案「上次完成日不能晚于今天」。
+- `chore.test.js`：闰日有效用例改为过去日期 `2024-02-29`；新增「明天」拒绝（`addDays(todayKey(), 1)`）与「今天」接受用例。
+
+### 测试
+
+- 修改前：`npx jest cloudfunctions/api` → 109 passed；`npm test` → 198 passed。
+- 修改后：`npx jest cloudfunctions/api` → 111 passed；`npm test` → 200 passed。

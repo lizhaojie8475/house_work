@@ -396,18 +396,20 @@ UI 着色阈值固定为 3 天，与推送阈值 `reminderLeadDays` 是两个独
 ├─ project.config.json
 ├─ package.json                      # Jest 与共享代码同步脚本
 ├─ docs/superpowers/specs/
-├─ shared/                           # 云函数间共享的纯函数（唯一真源）
+├─ shared/                           # 消费方共享代码（唯一真源）
 │  ├─ date.js                        # 本地日历日换算
 │  ├─ schedule.js                    # nextDueAt 计算
 │  ├─ urgency.js                     # 紧急度分档与排序
+│  ├─ repo.js                        # 云数据库访问层（db 由参数注入）
 │  └─ *.test.js
 ├─ scripts/
 │  └─ sync-shared.js                 # 把 shared/ 同步进云函数与小程序
 ├─ cloudfunctions/
 │  ├─ api/
-│  │  ├─ index.js                    # action 路由 + 统一鉴权
-│  │  ├─ actions/                    # 每个 action 一个文件
-│  │  ├─ lib/                        # 由 sync-shared 生成
+│  │  ├─ index.js                    # 装配路由与依赖
+│  │  ├─ actions/                    # 每个业务域一个文件
+│  │  ├─ lib/                        # 手写的 router/auth/errors + 同步生成的共享代码
+│  │  ├─ test/                       # 含内存假 repo
 │  │  └─ package.json
 │  └─ reminder/
 │     ├─ index.js
@@ -439,8 +441,8 @@ UI 着色阈值固定为 3 天，与推送阈值 `reminderLeadDays` 是两个独
 
 | 消费方 | 目标目录 | 同步的文件 |
 |---|---|---|
-| `api` 云函数 | `cloudfunctions/api/lib/` | `date.js`、`schedule.js`、`urgency.js` |
-| `reminder` 云函数 | `cloudfunctions/reminder/lib/` | `date.js`、`schedule.js`、`urgency.js` |
+| `api` 云函数 | `cloudfunctions/api/lib/` | `date.js`、`schedule.js`、`urgency.js`、`repo.js` |
+| `reminder` 云函数 | `cloudfunctions/reminder/lib/` | `date.js`、`schedule.js`、`urgency.js`、`repo.js` |
 | 小程序 | `miniprogram/utils/shared/` | `date.js`、`urgency.js` |
 
 这些生成目录不手工编辑，但需随代码提交到仓库——云函数上传时要求依赖文件已在位。

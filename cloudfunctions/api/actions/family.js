@@ -1,5 +1,6 @@
 const { appError, CODES } = require('../lib/errors');
 const { requireMember, requireOwner } = require('../lib/auth');
+const { isDuplicateKeyError } = require('../lib/db-conflict');
 const {
   INVITE_CODE_TTL_MS,
   generateInviteCode,
@@ -10,6 +11,17 @@ const DEFAULT_FAMILY_NAME = '我的家';
 const ALLOWED_REMINDER_HOURS = [7, 8, 20];
 const DEFAULT_SETTINGS = { reminderHour: 8, defaultReminderLeadDays: 1 };
 const MAX_INVITE_CODE_ATTEMPTS = 5;
+
+async function insertOrConflict(insert) {
+  try {
+    return await insert();
+  } catch (err) {
+    if (isDuplicateKeyError(err)) {
+      throw appError(CODES.CONFLICT, '操作太快了，请重新进入小程序重试');
+    }
+    throw err;
+  }
+}
 
 async function freshInvite(repo, now, random, currentCode = null) {
   for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt += 1) {
@@ -38,13 +50,15 @@ async function createOrGet({ openid, payload, repo, random }) {
 
   const now = Date.now();
   const invite = await freshInvite(repo, now, random);
-  const family = await repo.createFamily({
-    name: payload.name || DEFAULT_FAMILY_NAME,
-    ownerOpenid: openid,
-    ...invite,
-    settings: { ...DEFAULT_SETTINGS },
-    createdAt: now,
-  });
+  const family = await insertOrConflict(() =>
+    repo.createFamily({
+      name: payload.name || DEFAULT_FAMILY_NAME,
+      ownerOpenid: openid,
+      ...invite,
+      settings: { ...DEFAULT_SETTINGS },
+      createdAt: now,
+    })
+  );
   const member = existing
     ? await repo.updateMember(existing._id, {
         familyId: family._id,
@@ -52,16 +66,18 @@ async function createOrGet({ openid, payload, repo, random }) {
         active: true,
         joinedAt: now,
       })
-    : await repo.createMember({
-        familyId: family._id,
-        openid,
-        nickname: payload.nickname || '我',
-        avatarUrl: payload.avatarUrl || '',
-        role: 'owner',
-        subscribeQuota: 0,
-        joinedAt: now,
-        active: true,
-      });
+    : await insertOrConflict(() =>
+        repo.createMember({
+          familyId: family._id,
+          openid,
+          nickname: payload.nickname || '我',
+          avatarUrl: payload.avatarUrl || '',
+          role: 'owner',
+          subscribeQuota: 0,
+          joinedAt: now,
+          active: true,
+        })
+      );
   return { family, member, members: [member] };
 }
 
@@ -92,16 +108,18 @@ async function join({ openid, payload, repo }) {
         active: true,
         joinedAt: now,
       })
-    : await repo.createMember({
-        familyId: family._id,
-        openid,
-        nickname: payload.nickname || '家人',
-        avatarUrl: payload.avatarUrl || '',
-        role: 'member',
-        subscribeQuota: 0,
-        joinedAt: now,
-        active: true,
-      });
+    : await insertOrConflict(() =>
+        repo.createMember({
+          familyId: family._id,
+          openid,
+          nickname: payload.nickname || '家人',
+          avatarUrl: payload.avatarUrl || '',
+          role: 'member',
+          subscribeQuota: 0,
+          joinedAt: now,
+          active: true,
+        })
+      );
   return { family, member };
 }
 

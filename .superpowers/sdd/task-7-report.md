@@ -76,6 +76,70 @@ npm test
 
 无。
 
+## 唯一索引冲突兜底修复（2026-09-17）
+
+### 变更与原因
+
+- `test/fake-repo.js` 的 `createMember` 和 `createFamily` 现在分别模拟 `members.openid`、`families.inviteCode` 唯一索引；重复插入抛出同时带有 `errCode: -502001` 和 `duplicate key error` 消息的数据库错误。seed 数据保持原样装载，不执行约束检查。
+- 新增 `lib/db-conflict.js`，通过错误码或错误消息识别 CloudBase 重复键错误。
+- `family.createOrGet` 的家庭、成员插入以及 `family.join` 的成员插入会把重复键错误映射为 `appError(CODES.CONFLICT, '操作太快了，请重新进入小程序重试')`；其他错误原样抛出。
+- 新增辅助函数识别测试、fake repo 唯一约束测试，以及 `createOrGet`、`join` 在“查询未命中但插入冲突”并发竞态下的中文冲突错误测试。
+
+### 测试命令与完整结果
+
+修改前基线：
+
+```text
+$ npx jest cloudfunctions/api
+Test Suites: 5 passed, 5 total
+Tests:       57 passed, 57 total
+
+$ npm test
+Test Suites: 9 passed, 9 total
+Tests:       146 passed, 146 total
+```
+
+新增测试后的 RED：
+
+```text
+$ npx jest cloudfunctions/api/test/db-conflict.test.js cloudfunctions/api/test/fake-repo.test.js cloudfunctions/api/test/family.test.js
+Test Suites: 3 failed, 3 total
+Tests:       4 failed, 25 passed, 29 total
+```
+
+实现后的聚焦 GREEN：
+
+```text
+$ npx jest cloudfunctions/api/test/db-conflict.test.js cloudfunctions/api/test/fake-repo.test.js cloudfunctions/api/test/family.test.js
+Test Suites: 3 passed, 3 total
+Tests:       32 passed, 32 total
+```
+
+最终要求的完整验证：
+
+```text
+$ npx jest cloudfunctions/api
+Test Suites: 6 passed, 6 total
+Tests:       64 passed, 64 total
+
+$ npm test
+Test Suites: 10 passed, 10 total
+Tests:       153 passed, 153 total
+
+$ git diff --check
+（无输出，退出码 0）
+```
+
+IDE 诊断：本次修改的 6 个 JavaScript 文件均无 linter 错误。
+
+### 既有测试影响
+
+无。57 个既有 `cloudfunctions/api` 测试未作期望调整，且全部通过；没有既有 seed 数据或调用序列依赖违反唯一索引的不可实现状态。
+
+### Concerns
+
+无。
+
 ## Review Findings 修复报告（2026-09-17）
 
 ### 逐项修复

@@ -6,6 +6,12 @@ function nextId(prefix) {
   return `${prefix}${seq}`;
 }
 
+function duplicateKeyError(index, value) {
+  const err = new Error(`duplicate key error: ${index}=${value}`);
+  err.errCode = -502001;
+  return err;
+}
+
 function createFakeRepo(seed = {}) {
   const state = {
     families: [...(seed.families || [])],
@@ -28,6 +34,9 @@ function createFakeRepo(seed = {}) {
 
     // families
     async createFamily(doc) {
+      if (state.families.some((family) => family.inviteCode === doc.inviteCode)) {
+        throw duplicateKeyError('families.inviteCode', doc.inviteCode);
+      }
       const created = { _id: nextId('f'), ...doc };
       state.families.push(created);
       return clone(created);
@@ -51,6 +60,9 @@ function createFakeRepo(seed = {}) {
 
     // members
     async createMember(doc) {
+      if (state.members.some((member) => member.openid === doc.openid)) {
+        throw duplicateKeyError('members.openid', doc.openid);
+      }
       const created = { _id: nextId('m'), ...doc };
       state.members.push(created);
       return clone(created);

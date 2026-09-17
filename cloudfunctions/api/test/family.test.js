@@ -106,6 +106,18 @@ describe('family.createOrGet', () => {
       'BBBBBB',
     ]);
   });
+
+  test('并发创建导致成员写入重复时抛中文 CONFLICT', async () => {
+    const repo = createFakeRepo({
+      members: [{ ...ownerMember(), familyId: 'concurrent-family' }],
+    });
+    repo.findMemberByOpenid = jest.fn().mockResolvedValueOnce(null);
+
+    await expect(call('family.createOrGet', repo, 'openid-a')).rejects.toMatchObject({
+      code: CODES.CONFLICT,
+      message: expect.stringMatching(/[\u4e00-\u9fff]/),
+    });
+  });
 });
 
 describe('family.join', () => {
@@ -151,6 +163,21 @@ describe('family.join', () => {
     const repo = createFakeRepo({ families: [seededFamily()] });
     await expect(call('family.join', repo, 'openid-b', {})).rejects.toMatchObject({
       code: CODES.INVALID_ARGUMENT,
+    });
+  });
+
+  test('并发加入导致成员写入重复时抛中文 CONFLICT', async () => {
+    const repo = createFakeRepo({
+      families: [seededFamily()],
+      members: [{ ...ownerMember(), openid: 'openid-b' }],
+    });
+    repo.findMemberByOpenid = jest.fn().mockResolvedValueOnce(null);
+
+    await expect(
+      call('family.join', repo, 'openid-b', { inviteCode: 'ABC123' })
+    ).rejects.toMatchObject({
+      code: CODES.CONFLICT,
+      message: expect.stringMatching(/[\u4e00-\u9fff]/),
     });
   });
 });

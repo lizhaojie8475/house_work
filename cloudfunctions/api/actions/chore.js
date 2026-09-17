@@ -7,11 +7,18 @@ const { todayKey } = require('../lib/date');
 
 const MAX_BATCH_SIZE = 50;
 
+const CHORE_NOT_FOUND_MESSAGE = '这件家务不存在或已被删除';
+
 async function loadOwnChore(repo, familyId, choreId) {
   const chore = await repo.getChore(choreId);
-  if (!chore) throw appError(CODES.NOT_FOUND, '这件家务不存在或已被删除');
+  if (!chore) throw appError(CODES.NOT_FOUND, CHORE_NOT_FOUND_MESSAGE);
   if (chore.familyId !== familyId) {
-    throw appError(CODES.FORBIDDEN, '无权操作其他家庭的家务');
+    // 与「不存在」返回相同 code/message，避免通过错误码探测系统中是否存在该 id。
+    // 合法用户只会访问本家庭家务；跨家庭仅见于误配或探测，服务端日志保留诊断信息。
+    console.error(
+      `loadOwnChore cross-family: choreId=${choreId} ownerFamilyId=${chore.familyId} callerFamilyId=${familyId}`
+    );
+    throw appError(CODES.NOT_FOUND, CHORE_NOT_FOUND_MESSAGE);
   }
   return chore;
 }

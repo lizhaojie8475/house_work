@@ -362,11 +362,28 @@ describe('chore.get', () => {
     ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
   });
 
-  test('跨家庭访问抛 FORBIDDEN', async () => {
+  test('跨家庭访问返回 NOT_FOUND，不泄露 id 是否存在', async () => {
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
     await expect(
       call('chore.get', repo, 'openid-a', { choreId: 'c9' })
-    ).rejects.toMatchObject({ code: CODES.FORBIDDEN });
+    ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
+  });
+
+  test('不存在与跨家庭拒绝的 code 与 message 完全一致', async () => {
+    const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
+    const capture = async (choreId) => {
+      try {
+        await call('chore.get', repo, 'openid-a', { choreId });
+        throw new Error('expected rejection');
+      } catch (err) {
+        if (err.message === 'expected rejection') throw err;
+        return err;
+      }
+    };
+    const missing = await capture('nope');
+    const crossFamily = await capture('c9');
+    expect(crossFamily.code).toEqual(missing.code);
+    expect(crossFamily.message).toEqual(missing.message);
   });
 });
 
@@ -443,11 +460,11 @@ describe('chore.update', () => {
     expect(res.chore.nextDueAt).toBe('2026-09-20');
   });
 
-  test('跨家庭修改抛 FORBIDDEN', async () => {
+  test('跨家庭修改返回 NOT_FOUND，不泄露 id 是否存在', async () => {
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
     await expect(
       call('chore.update', repo, 'openid-a', { choreId: 'c9', name: 'x' })
-    ).rejects.toMatchObject({ code: CODES.FORBIDDEN });
+    ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
   });
 });
 

@@ -91,3 +91,15 @@
 
 - 修改前：`npx jest cloudfunctions/api` → 109 passed；`npm test` → 198 passed。
 - 修改后：`npx jest cloudfunctions/api` → 111 passed；`npm test` → 200 passed。
+
+## loadOwnChore 防 id 探测（2026-09-17）
+
+### 变更
+
+- `loadOwnChore`：跨家庭访问与「不存在」均返回 `NOT_FOUND` 及同一中文文案（共享常量 `CHORE_NOT_FOUND_MESSAGE`）；跨家庭时 `console.error` 记录 choreId、ownerFamilyId、callerFamilyId；注释说明故意不区分两分支。`requireMember` / `requireOwner` 的 `FORBIDDEN` 未改动。
+- `chore.test.js`：两处跨家庭用例改为断言 `NOT_FOUND` 并重命名；新增「不存在与跨家庭拒绝的 code 与 message 完全一致」用例。
+
+### 测试
+
+- 修改前：`npx jest cloudfunctions/api` → 111 passed；`npm test` → 200 passed。
+- 修改后：`npx jest cloudfunctions/api` → 112 passed；`npm test` → 201 passed。

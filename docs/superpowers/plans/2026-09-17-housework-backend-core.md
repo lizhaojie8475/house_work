@@ -2485,11 +2485,11 @@ describe('chore.get', () => {
     ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
   });
 
-  test('跨家庭访问抛 FORBIDDEN', async () => {
+  test('跨家庭访问返回 NOT_FOUND，不泄露 id 存在性', async () => {
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
     await expect(
       call('chore.get', repo, 'openid-a', { choreId: 'c9' })
-    ).rejects.toMatchObject({ code: CODES.FORBIDDEN });
+    ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
   });
 });
 
@@ -2549,11 +2549,11 @@ describe('chore.update', () => {
     expect(res.chore.nextDueAt).toBe('2026-09-20');
   });
 
-  test('跨家庭修改抛 FORBIDDEN', async () => {
+  test('跨家庭修改返回 NOT_FOUND，不泄露 id 存在性', async () => {
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
     await expect(
       call('chore.update', repo, 'openid-a', { choreId: 'c9', name: 'x' })
-    ).rejects.toMatchObject({ code: CODES.FORBIDDEN });
+    ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
   });
 });
 
@@ -2688,11 +2688,18 @@ const { todayKey } = require('../lib/date');
 
 const MAX_BATCH_SIZE = 50;
 
+// 跨家庭访问与「不存在」返回同一个错误码，避免把家务 id 的存在性泄露成探测器：
+// 若两者错误码不同，攻击者拿一串 id 试一遍就能区分哪些真实存在。
+// 正常用户不会合法撞到跨家庭分支，所以合并不损失任何用户可见体验；
+// 该分支单独写服务端日志，排查能力仍然保留。
 async function loadOwnChore(repo, familyId, choreId) {
   const chore = await repo.getChore(choreId);
   if (!chore) throw appError(CODES.NOT_FOUND, '这件家务不存在或已被删除');
   if (chore.familyId !== familyId) {
-    throw appError(CODES.FORBIDDEN, '无权操作其他家庭的家务');
+    console.error(
+      `[chore] cross-family access blocked: chore=${choreId} owner=${chore.familyId} caller=${familyId}`
+    );
+    throw appError(CODES.NOT_FOUND, '这件家务不存在或已被删除');
   }
   return chore;
 }
@@ -3046,11 +3053,11 @@ describe('log.complete', () => {
     expect(res.log.note).toBe('顺手换了刷头');
   });
 
-  test('跨家庭完成抛 FORBIDDEN', async () => {
+  test('跨家庭完成返回 NOT_FOUND，不泄露 id 存在性', async () => {
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
     await expect(
       call('log.complete', repo, 'openid-a', { choreId: 'c9' })
-    ).rejects.toMatchObject({ code: CODES.FORBIDDEN });
+    ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
   });
 });
 
@@ -3184,11 +3191,11 @@ describe('log.list', () => {
     ).rejects.toMatchObject({ code: CODES.INVALID_ARGUMENT });
   });
 
-  test('跨家庭查询抛 FORBIDDEN', async () => {
+  test('跨家庭查询返回 NOT_FOUND，不泄露 id 存在性', async () => {
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
     await expect(
       call('log.list', repo, 'openid-a', { choreId: 'c9' })
-    ).rejects.toMatchObject({ code: CODES.FORBIDDEN });
+    ).rejects.toMatchObject({ code: CODES.NOT_FOUND });
   });
 });
 ```

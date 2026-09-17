@@ -3593,6 +3593,15 @@ repo 实现同时被 `api` 与 `reminder` 两个云函数使用，因此它属�
 - Consumes: `test/fake-repo.js` 的 `createFakeRepo`（仅用于契约对比）
 - Produces:
   - `shared/repo.js`：`COLLECTIONS: { FAMILIES: 'families', MEMBERS: 'members', CHORES: 'chores', LOGS: 'chore_logs', REMINDER_SENDS: 'reminder_sends' }`、`createRepo(db, command): repo`。同步后云函数通过 `./lib/repo` 引用
+
+注意其中两个方法是 Task 7 审查后新增的，语义比其余方法严格，不得随手简化：
+
+- `claimInactiveMember(memberId, patch): Promise<member | null>` — **条件更新**，只在记录仍为
+  `active: false` 时生效；未生效时返回 `null`。这是「一人一个家庭」在更新路径上的原子保障：
+  唯一索引只约束插入，约束不了更新，而复用已退出成员记录走的正是更新。**绝不可以退化成
+  `doc(id).update()`**，否则并发请求会双方都返回成功、最终家庭归属取决于最后一个写入者。
+- `deleteFamily(familyId): Promise<boolean>` — `createOrGet` 在认领成员失败时用它做补偿，
+  删除刚创建的孤儿家庭。
   - `index.js`：`exports.main`，用 `wx-server-sdk` 装配 `createRouter`
 
 - [ ] **Step 1: 写失败的契约测试**
@@ -3696,6 +3705,10 @@ function createRepo(db, command) {
       const res = await col(COLLECTIONS.FAMILIES).where({ inviteCode: code }).limit(1).get();
       return firstOrNull(res);
     },
+    async deleteFamily(id) {
+      const res = await col(COLLECTIONS.FAMILIES).doc(id).remove();
+      return Boolean(res.stats && res.stats.removed > 0);
+    },
     async listFamiliesByReminderHour(hour) {
       const res = await col(COLLECTIONS.FAMILIES)
         .where({ 'settings.reminderHour': hour })
@@ -3724,6 +3737,17 @@ function createRepo(db, command) {
       await col(COLLECTIONS.MEMBERS).doc(id).update({ data: patch });
       const res = await col(COLLECTIONS.MEMBERS).where({ _id: id }).limit(1).get();
       return firstOrNull(res);
+    },
+    async claimInactiveMember(memberId, patch) {
+      // 条件更新：where 带上 active: false，云数据库会回报实际更新的文档数。
+      // 为 0 即说明并发请求已抢先认领，这是更新路径上唯一的原子保障。
+      // 不可改成 doc(id).update()，那样条件就没了。
+      const res = await col(COLLECTIONS.MEMBERS)
+        .where({ _id: memberId, active: false })
+        .update({ data: patch });
+      if (!res.stats || res.stats.updated === 0) return null;
+      const found = await col(COLLECTIONS.MEMBERS).where({ _id: memberId }).limit(1).get();
+      return firstOrNull(found);
     },
 
     // chores

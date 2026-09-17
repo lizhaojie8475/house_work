@@ -28,7 +28,17 @@ describe('createRouter', () => {
     expect(res.code).toBe(CODES.UNKNOWN_ACTION);
   });
 
-  test.each(['toString', 'constructor'])('原型链 action %s 返回 UNKNOWN_ACTION', async (action) => {
+  test.each([null, undefined])('event 为 %p 时返回 UNKNOWN_ACTION 且不抛错', async (event) => {
+    const handle = build({});
+    const res = await handle(event);
+    expect(res).toEqual({
+      ok: false,
+      code: CODES.UNKNOWN_ACTION,
+      message: '未知操作：undefined',
+    });
+  });
+
+  test.each(['toString', 'constructor', '__proto__'])('原型链 action %s 返回 UNKNOWN_ACTION', async (action) => {
     const handle = build({});
     const res = await handle({ action });
     expect(res.ok).toBe(false);
@@ -106,6 +116,17 @@ describe('createRouter', () => {
     const res = await handle({ action: 'ping.do' });
     expect(res).toEqual({ ok: false, code: CODES.INTERNAL, message: '服务异常，请稍后重试' });
     expect(res.message).not.toContain('内部敏感信息');
+  });
+
+  test('标记业务错误但 code 为 CODES 原型链键时收敛为 INTERNAL 且不泄露消息', async () => {
+    const handle = build({
+      'ping.do': async () => {
+        throw appError('constructor', '敏感信息');
+      },
+    });
+    const res = await handle({ action: 'ping.do' });
+    expect(res).toEqual({ ok: false, code: CODES.INTERNAL, message: '服务异常，请稍后重试' });
+    expect(JSON.stringify(res)).not.toContain('敏感信息');
   });
 
   test('伪造的已知错误码统一收敛为 INTERNAL', async () => {

@@ -4,7 +4,10 @@ const hasOwn = (object, property) => Object.prototype.hasOwnProperty.call(object
 
 // 单入口 + action 路由。所有依赖通过参数注入，便于单元测试替换。
 function createRouter({ actions, getOpenid, getRepo, logger = console }) {
-  return async function handle(event = {}) {
+  return async function handle(event) {
+    if (event == null || typeof event !== 'object') {
+      event = {};
+    }
     const { action, payload = {} } = event;
     const handler = hasOwn(actions, action) ? actions[action] : undefined;
     if (typeof handler !== 'function') {

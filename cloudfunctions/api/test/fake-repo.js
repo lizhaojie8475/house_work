@@ -87,6 +87,9 @@ function createFakeRepo(seed = {}) {
       return clone(patchDoc(doc, patch));
     },
     // 模拟 CloudBase where({ _id, active: false }).update() 的原子条件更新语义。
+    // 真实实现必须保留 where 上的 active: false 条件并据实际更新文档数判断成败，
+    // 绝不可退化为无条件的 doc(id).update()——唯一索引只约束插入，
+    // 复用已退出成员记录走的是更新，这里是该路径上唯一的原子保障。
     async claimInactiveMember(id, patch) {
       const doc = state.members.find((m) => m._id === id && m.active === false);
       if (!doc) return null;

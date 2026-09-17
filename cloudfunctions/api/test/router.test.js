@@ -28,6 +28,13 @@ describe('createRouter', () => {
     expect(res.code).toBe(CODES.UNKNOWN_ACTION);
   });
 
+  test.each(['toString', 'constructor'])('原型链 action %s 返回 UNKNOWN_ACTION', async (action) => {
+    const handle = build({});
+    const res = await handle({ action });
+    expect(res.ok).toBe(false);
+    expect(res.code).toBe(CODES.UNKNOWN_ACTION);
+  });
+
   test('缺少 action 返回 UNKNOWN_ACTION', async () => {
     const handle = build({});
     expect((await handle({})).code).toBe(CODES.UNKNOWN_ACTION);
@@ -88,6 +95,46 @@ describe('createRouter', () => {
     });
     const res = await handle({ action: 'ping.do' });
     expect(res).toEqual({ ok: false, code: CODES.INTERNAL, message: '服务异常，请稍后重试' });
+  });
+
+  test('原型链错误码统一收敛为 INTERNAL 且不泄露消息', async () => {
+    const handle = build({
+      'ping.do': async () => {
+        throw Object.assign(new Error('内部敏感信息'), { code: 'constructor' });
+      },
+    });
+    const res = await handle({ action: 'ping.do' });
+    expect(res).toEqual({ ok: false, code: CODES.INTERNAL, message: '服务异常，请稍后重试' });
+    expect(res.message).not.toContain('内部敏感信息');
+  });
+
+  test('伪造的已知错误码统一收敛为 INTERNAL', async () => {
+    const handle = build({
+      'ping.do': async () => {
+        throw Object.assign(new Error('内部敏感信息'), { code: CODES.FORBIDDEN });
+      },
+    });
+    expect(await handle({ action: 'ping.do' })).toEqual({
+      ok: false,
+      code: CODES.INTERNAL,
+      message: '服务异常，请稍后重试',
+    });
+  });
+
+  test('getOpenid 抛错时统一收敛为 INTERNAL', async () => {
+    const handle = createRouter({
+      actions: { 'ping.do': async () => 1 },
+      getOpenid: () => {
+        throw new Error('identity provider failed');
+      },
+      getRepo: () => ({}),
+      logger: noopLogger,
+    });
+    await expect(handle({ action: 'ping.do' })).resolves.toEqual({
+      ok: false,
+      code: CODES.INTERNAL,
+      message: '服务异常，请稍后重试',
+    });
   });
 
   test('未预期异常会记录日志', async () => {

@@ -8,11 +8,18 @@ const CODES = {
   INTERNAL: 'INTERNAL',
 };
 
+const APP_ERROR_MARKER = Symbol('appError');
+
 // message 会直接展示给用户，必须是中文且可读。
 function appError(code, message) {
   const err = new Error(message);
   err.code = code;
+  Object.defineProperty(err, APP_ERROR_MARKER, { value: true });
   return err;
 }
 
-module.exports = { CODES, appError };
+function isAppError(err) {
+  return Boolean(err && err[APP_ERROR_MARKER] === true);
+}
+
+module.exports = { CODES, appError, isAppError };

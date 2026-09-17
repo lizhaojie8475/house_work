@@ -17,6 +17,11 @@ function createFakeRepo(seed = {}) {
 
   const clone = (doc) => (doc ? JSON.parse(JSON.stringify(doc)) : doc);
   const patchDoc = (doc, patch) => Object.assign(doc, patch);
+  const createChore = async (doc) => {
+    const created = { _id: nextId('c'), ...doc };
+    state.chores.push(created);
+    return clone(created);
+  };
 
   return {
     _state: state,
@@ -65,13 +70,9 @@ function createFakeRepo(seed = {}) {
     },
 
     // chores
-    async createChore(doc) {
-      const created = { _id: nextId('c'), ...doc };
-      state.chores.push(created);
-      return clone(created);
-    },
+    createChore,
     async createChores(docs) {
-      return Promise.all(docs.map((d) => this.createChore(d)));
+      return Promise.all(docs.map(createChore));
     },
     async getChore(id) {
       return clone(state.chores.find((c) => c._id === id) || null);

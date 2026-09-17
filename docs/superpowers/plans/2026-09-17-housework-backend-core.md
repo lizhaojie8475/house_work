@@ -1130,7 +1130,10 @@ describe('syncShared', () => {
       targets: [{ dir: 'cloudfunctions/api/lib', files: ['date.js'] }],
     });
     const written = path.join(rootDir, 'cloudfunctions/api/lib/date.js');
-    expect(fs.readFileSync(written, 'utf8')).toBe('// date');
+    // 写入内容包含禁止手工编辑的头注释，故断言完整内容
+    expect(fs.readFileSync(written, 'utf8')).toBe(
+      '// 此文件由 scripts/sync-shared.js 自动生成，请勿手工编辑。\n// 源文件：shared/date.js\n// date'
+    );
   });
 
   test('返回实际写入清单', () => {
@@ -1146,7 +1149,9 @@ describe('syncShared', () => {
     syncShared({ rootDir, targets });
     fs.writeFileSync(path.join(rootDir, 'shared', 'date.js'), '// updated');
     syncShared({ rootDir, targets });
-    expect(fs.readFileSync(path.join(rootDir, 'a/lib/date.js'), 'utf8')).toBe('// updated');
+    expect(fs.readFileSync(path.join(rootDir, 'a/lib/date.js'), 'utf8')).toBe(
+      '// 此文件由 scripts/sync-shared.js 自动生成，请勿手工编辑。\n// 源文件：shared/date.js\n// updated'
+    );
   });
 
   test('源文件缺失时抛错而非静默跳过', () => {
@@ -4741,9 +4746,11 @@ Expected: 项目成功打开，左侧目录树可见 `cloudfunctions` 与 `minip
 Run: `npm run sync:shared`
 Expected: 输出三行 synced
 
+先在开发者工具右下角「详情」→「本地设置」确认云函数默认运行时，或在上传弹窗中将运行时选为 **Node.js 18**（全局约束要求）。上传后可在云开发控制台的云函数列表中核对每个函数的运行环境列。
+
 在开发者工具中右键 `cloudfunctions/api` →「上传并部署：云端安装依赖」，等待完成。对 `cloudfunctions/reminder` 重复同样操作。
 
-Expected: 控制台显示「上传成功」，云开发控制台的云函数列表中出现 `api` 与 `reminder`
+Expected: 控制台显示「上传成功」，云开发控制台的云函数列表中出现 `api` 与 `reminder`，且两者运行环境均为 Node.js 18
 
 - [ ] **Step 6: 端到端验证家庭与家务链路**
 

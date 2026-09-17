@@ -4699,7 +4699,7 @@ Expected: 项目成功打开，左侧目录树可见 `cloudfunctions` 与 `minip
 | `members` | `openid` | `openid` 升序 | 是 |
 | `members` | `family_active` | `familyId` 升序、`active` 升序 | 否 |
 | `chore_logs` | `chore_done` | `choreId` 升序、`doneAt` 降序 | 否 |
-| `families` | `invite_code` | `inviteCode` 升序 | 否 |
+| `families` | `invite_code` | `inviteCode` 升序 | 是 |
 | `reminder_sends` | `openid_date` | `openid` 升序、`dateKey` 升序 | 是 |
 
 把这份表格连同操作说明写入 `docs/db-setup.md`，内容如下：
@@ -4724,11 +4724,20 @@ Expected: 项目成功打开，左侧目录树可见 `cloudfunctions` 与 `minip
 | members | openid | openid 升序 | 是 |
 | members | family_active | familyId 升序、active 升序 | 否 |
 | chore_logs | chore_done | choreId 升序、doneAt 降序 | 否 |
-| families | invite_code | inviteCode 升序 | 否 |
+| families | invite_code | inviteCode 升序 | 是 |
 | reminder_sends | openid_date | openid 升序、dateKey 升序 | 是 |
 
-`members.openid` 唯一索引保证一个微信用户只属于一个家庭。
-`reminder_sends.openid_date` 唯一索引在应用层去重之外再兜一层，保证同一天只发一次。
+## 三个唯一索引各自兼底的东西
+
+`members.openid`：保证一个微信用户只属于一个家庭。这是「一人一个家庭」不变式的最终保障：
+`family.createOrGet` 与 `family.join` 都是「先查再写」，第一期不引入事务，并发双写靠该索引
+直接报错而不是产生两条成员记录——即故障关闭而非数据损坏。写入冲突由 action 层映射为可读的
+中文提示，不让用户看到通用服务异常。
+
+`families.inviteCode`：防止两个家庭持有同一邀请码。因为 `findFamilyByInviteCode` 只取第一条匹配，
+碰撞会让加入者进错家庭。应用层已有碰撞重试，该索引是第二道防线。
+
+`reminder_sends.openid_date`：在应用层去重之外再兜一层，保证同一天只发一条推送。
 ```
 
 - [ ] **Step 4: 配置 reminder 云函数环境变量**

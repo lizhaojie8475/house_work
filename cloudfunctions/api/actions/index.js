@@ -1,6 +1,7 @@
 // action 注册表。每个 handler 签名为 ({ openid, payload, repo }) => Promise<any>。
 const family = require('./family');
 const chore = require('./chore');
+const log = require('./log');
 
 module.exports = {
   'family.createOrGet': family['family.createOrGet'],
@@ -15,4 +16,9 @@ module.exports = {
   'chore.get': chore['chore.get'],
   'chore.update': chore['chore.update'],
   'chore.setArchived': chore['chore.setArchived'],
+
+  'log.complete': log['log.complete'],
+  'log.undo': log['log.undo'],
+  'log.skip': log['log.skip'],
+  'log.list': log['log.list'],
 };

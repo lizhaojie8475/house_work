@@ -80,3 +80,135 @@ describe('computeNextDueAt · 非法输入', () => {
     ).toThrow(/intervalDays/);
   });
 });
+
+describe('computeNextDueAt · 固定日历 weekly', () => {
+  const weekly = (weekdays) => ({
+    scheduleType: 'fixed',
+    fixedRule: { type: 'weekly', weekdays },
+  });
+
+  test('每周日，基准是周四，返回本周日', () => {
+    // 2026-09-17 是周四，2026-09-20 是周日
+    expect(computeNextDueAt(weekly([0]), '2026-09-17')).toBe('2026-09-20');
+  });
+
+  test('基准正好是规则日时返回下一周，不返回当天', () => {
+    // 2026-09-20 是周日
+    expect(computeNextDueAt(weekly([0]), '2026-09-20')).toBe('2026-09-27');
+  });
+
+  test('跳过一次不累积：上次完成是上周日，今天周三，下次仍是本周日', () => {
+    // 基准 2026-09-13（周日）-> 2026-09-20（周日）
+    expect(computeNextDueAt(weekly([0]), '2026-09-13')).toBe('2026-09-20');
+  });
+
+  test('多选周二和周四，基准周四返回下周二', () => {
+    // 2026-09-17 周四 -> 2026-09-22 周二
+    expect(computeNextDueAt(weekly([2, 4]), '2026-09-17')).toBe('2026-09-22');
+  });
+
+  test('多选周二和周四，基准周一返回本周二', () => {
+    // 2026-09-14 周一 -> 2026-09-15 周二
+    expect(computeNextDueAt(weekly([2, 4]), '2026-09-14')).toBe('2026-09-15');
+  });
+
+  test('weekdays 顺序打乱不影响结果', () => {
+    expect(computeNextDueAt(weekly([4, 2]), '2026-09-14')).toBe('2026-09-15');
+  });
+
+  test('weekdays 为空数组抛错', () => {
+    expect(() => computeNextDueAt(weekly([]), '2026-09-17')).toThrow(/weekdays/);
+  });
+
+  test('weekdays 含越界值抛错', () => {
+    expect(() => computeNextDueAt(weekly([7]), '2026-09-17')).toThrow(/weekdays/);
+  });
+});
+
+describe('computeNextDueAt · 固定日历 monthly', () => {
+  const monthly = (dayOfMonth) => ({
+    scheduleType: 'fixed',
+    fixedRule: { type: 'monthly', dayOfMonth },
+  });
+
+  test('每月 1 号，基准月中返回下月 1 号', () => {
+    expect(computeNextDueAt(monthly(1), '2026-09-17')).toBe('2026-10-01');
+  });
+
+  test('每月 25 号，基准月初返回本月 25 号', () => {
+    expect(computeNextDueAt(monthly(25), '2026-09-03')).toBe('2026-09-25');
+  });
+
+  test('基准正好是规则日时返回下个月', () => {
+    expect(computeNextDueAt(monthly(25), '2026-09-25')).toBe('2026-10-25');
+  });
+
+  test('每月 31 号遇 2 月取该月最后一天', () => {
+    expect(computeNextDueAt(monthly(31), '2026-01-31')).toBe('2026-02-28');
+  });
+
+  test('每月 31 号遇闰年 2 月取 29 号', () => {
+    expect(computeNextDueAt(monthly(31), '2028-01-31')).toBe('2028-02-29');
+  });
+
+  test('每月 31 号遇 4 月取 30 号', () => {
+    expect(computeNextDueAt(monthly(31), '2026-03-31')).toBe('2026-04-30');
+  });
+
+  test('跨年', () => {
+    expect(computeNextDueAt(monthly(1), '2026-12-15')).toBe('2027-01-01');
+  });
+
+  test('dayOfMonth 越界抛错', () => {
+    expect(() => computeNextDueAt(monthly(32), '2026-09-17')).toThrow(/dayOfMonth/);
+    expect(() => computeNextDueAt(monthly(0), '2026-09-17')).toThrow(/dayOfMonth/);
+  });
+});
+
+describe('computeNextDueAt · 固定日历 yearly', () => {
+  const yearly = (month, dayOfMonth) => ({
+    scheduleType: 'fixed',
+    fixedRule: { type: 'yearly', month, dayOfMonth },
+  });
+
+  test('每年 4 月 15 日，基准 5 月返回次年', () => {
+    expect(computeNextDueAt(yearly(4, 15), '2026-05-01')).toBe('2027-04-15');
+  });
+
+  test('每年 10 月 1 日，基准 9 月返回当年', () => {
+    expect(computeNextDueAt(yearly(10, 1), '2026-09-17')).toBe('2026-10-01');
+  });
+
+  test('基准正好是规则日时返回次年', () => {
+    expect(computeNextDueAt(yearly(10, 1), '2026-10-01')).toBe('2027-10-01');
+  });
+
+  test('每年 2 月 29 日在非闰年取 2 月 28 日', () => {
+    expect(computeNextDueAt(yearly(2, 29), '2026-01-01')).toBe('2026-02-28');
+  });
+
+  test('每年 2 月 29 日在闰年取 2 月 29 日', () => {
+    expect(computeNextDueAt(yearly(2, 29), '2028-01-01')).toBe('2028-02-29');
+  });
+
+  test('month 越界抛错', () => {
+    expect(() => computeNextDueAt(yearly(13, 1), '2026-09-17')).toThrow(/month/);
+  });
+});
+
+describe('computeNextDueAt · 固定日历非法规则', () => {
+  test('缺少 fixedRule 抛错', () => {
+    expect(() => computeNextDueAt({ scheduleType: 'fixed' }, '2026-09-17')).toThrow(
+      /fixedRule/
+    );
+  });
+
+  test('未知 fixedRule.type 抛错', () => {
+    expect(() =>
+      computeNextDueAt(
+        { scheduleType: 'fixed', fixedRule: { type: 'hourly' } },
+        '2026-09-17'
+      )
+    ).toThrow(/unsupported fixedRule type/);
+  });
+});

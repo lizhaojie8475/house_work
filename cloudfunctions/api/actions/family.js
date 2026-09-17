@@ -9,15 +9,26 @@ const {
 const DEFAULT_FAMILY_NAME = '我的家';
 const ALLOWED_REMINDER_HOURS = [7, 8, 20];
 const DEFAULT_SETTINGS = { reminderHour: 8, defaultReminderLeadDays: 1 };
+const MAX_INVITE_CODE_ATTEMPTS = 5;
 
-function freshInvite(now) {
-  return {
-    inviteCode: generateInviteCode(),
-    inviteCodeExpireAt: now + INVITE_CODE_TTL_MS,
-  };
+async function freshInvite(repo, now, random, currentCode = null) {
+  for (let attempt = 0; attempt < MAX_INVITE_CODE_ATTEMPTS; attempt += 1) {
+    const inviteCode = generateInviteCode(random);
+    if (inviteCode === currentCode) continue;
+
+    const collision = await repo.findFamilyByInviteCode(inviteCode);
+    if (!collision) {
+      return {
+        inviteCode,
+        inviteCodeExpireAt: now + INVITE_CODE_TTL_MS,
+      };
+    }
+  }
+
+  throw appError(CODES.INTERNAL, '邀请码生成失败，请稍后重试');
 }
 
-async function createOrGet({ openid, payload, repo }) {
+async function createOrGet({ openid, payload, repo, random }) {
   const existing = await repo.findMemberByOpenid(openid);
   if (existing && existing.active) {
     const family = await repo.getFamily(existing.familyId);
@@ -26,23 +37,31 @@ async function createOrGet({ openid, payload, repo }) {
   }
 
   const now = Date.now();
+  const invite = await freshInvite(repo, now, random);
   const family = await repo.createFamily({
     name: payload.name || DEFAULT_FAMILY_NAME,
     ownerOpenid: openid,
-    ...freshInvite(now),
+    ...invite,
     settings: { ...DEFAULT_SETTINGS },
     createdAt: now,
   });
-  const member = await repo.createMember({
-    familyId: family._id,
-    openid,
-    nickname: payload.nickname || '我',
-    avatarUrl: payload.avatarUrl || '',
-    role: 'owner',
-    subscribeQuota: 0,
-    joinedAt: now,
-    active: true,
-  });
+  const member = existing
+    ? await repo.updateMember(existing._id, {
+        familyId: family._id,
+        role: 'owner',
+        active: true,
+        joinedAt: now,
+      })
+    : await repo.createMember({
+        familyId: family._id,
+        openid,
+        nickname: payload.nickname || '我',
+        avatarUrl: payload.avatarUrl || '',
+        role: 'owner',
+        subscribeQuota: 0,
+        joinedAt: now,
+        active: true,
+      });
   return { family, member, members: [member] };
 }
 
@@ -86,9 +105,10 @@ async function join({ openid, payload, repo }) {
   return { family, member };
 }
 
-async function refreshInviteCode({ openid, repo }) {
+async function refreshInviteCode({ openid, repo, random }) {
   const member = await requireOwner(repo, openid);
-  const invite = freshInvite(Date.now());
+  const family = await repo.getFamily(member.familyId);
+  const invite = await freshInvite(repo, Date.now(), random, family.inviteCode);
   await repo.updateFamily(member.familyId, invite);
   return invite;
 }

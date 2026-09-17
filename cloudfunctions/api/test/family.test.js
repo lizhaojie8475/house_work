@@ -2,8 +2,13 @@ const actions = require('../actions');
 const { CODES } = require('../lib/errors');
 const { createFakeRepo } = require('./fake-repo');
 
-const call = (name, repo, openid, payload = {}) =>
-  actions[name]({ openid, payload, repo });
+const call = (name, repo, openid, payload = {}, context = {}) =>
+  actions[name]({ openid, payload, repo, ...context });
+
+const sequenceRandom = (...values) => {
+  let index = 0;
+  return () => values[index++] ?? values[values.length - 1];
+};
 
 const seededFamily = (overrides = {}) => ({
   _id: 'f1',
@@ -64,6 +69,42 @@ describe('family.createOrGet', () => {
     expect(res.family._id).toBe('f1');
     expect(repo._state.families).toHaveLength(1);
     expect(repo._state.members).toHaveLength(1);
+  });
+
+  test('已退出用户重新创建家庭时复用并激活原成员记录', async () => {
+    const inactiveMember = { ...ownerMember(), active: false, role: 'member' };
+    const repo = createFakeRepo({
+      families: [seededFamily()],
+      members: [inactiveMember],
+    });
+
+    const res = await call('family.createOrGet', repo, 'openid-a');
+
+    expect(repo._state.members).toHaveLength(1);
+    expect(res.member).toMatchObject({
+      _id: inactiveMember._id,
+      familyId: res.family._id,
+      role: 'owner',
+      active: true,
+    });
+    await expect(call('family.listMembers', repo, 'openid-a')).resolves.toMatchObject({
+      members: [{ _id: inactiveMember._id, familyId: res.family._id, role: 'owner' }],
+    });
+  });
+
+  test('新建家庭的邀请码碰撞时重新生成', async () => {
+    const repo = createFakeRepo({
+      families: [seededFamily({ inviteCode: 'AAAAAA' })],
+    });
+    const random = sequenceRandom(...Array(6).fill(0), ...Array(6).fill(1 / 32));
+
+    const res = await call('family.createOrGet', repo, 'openid-b', {}, { random });
+
+    expect(res.family.inviteCode).toBe('BBBBBB');
+    expect(repo._state.families.map((family) => family.inviteCode)).toEqual([
+      'AAAAAA',
+      'BBBBBB',
+    ]);
   });
 });
 
@@ -134,6 +175,39 @@ describe('family.refreshInviteCode', () => {
     });
     await expect(call('family.refreshInviteCode', repo, 'openid-b')).rejects.toMatchObject({
       code: CODES.FORBIDDEN,
+    });
+  });
+
+  test('重新生成时不会返回当前邀请码', async () => {
+    const repo = createFakeRepo({
+      families: [seededFamily({ inviteCode: 'AAAAAA' })],
+      members: [ownerMember()],
+    });
+    const random = sequenceRandom(...Array(6).fill(0), ...Array(6).fill(1 / 32));
+
+    const res = await call(
+      'family.refreshInviteCode',
+      repo,
+      'openid-a',
+      {},
+      { random }
+    );
+
+    expect(res.inviteCode).toBe('BBBBBB');
+    expect(repo._state.families[0].inviteCode).toBe('BBBBBB');
+  });
+
+  test('邀请码连续碰撞时抛 INTERNAL 业务错误', async () => {
+    const repo = createFakeRepo({
+      families: [seededFamily({ inviteCode: 'AAAAAA' })],
+      members: [ownerMember()],
+    });
+
+    await expect(
+      call('family.refreshInviteCode', repo, 'openid-a', {}, { random: () => 0 })
+    ).rejects.toMatchObject({
+      code: CODES.INTERNAL,
+      message: expect.stringMatching(/[\u4e00-\u9fff]/),
     });
   });
 });

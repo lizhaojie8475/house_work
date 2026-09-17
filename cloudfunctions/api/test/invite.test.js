@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const {
   INVITE_CODE_TTL_MS,
   generateInviteCode,
@@ -20,8 +21,19 @@ describe('generateInviteCode', () => {
     expect(generateInviteCode(() => 0)).toBe(generateInviteCode(() => 0));
   });
 
+  test('默认使用 crypto.randomInt 生成随机索引', () => {
+    const randomInt = jest.spyOn(crypto, 'randomInt').mockReturnValue(0);
+
+    expect(generateInviteCode()).toBe('AAAAAA');
+    expect(randomInt).toHaveBeenCalledTimes(6);
+
+    randomInt.mockRestore();
+  });
+
   test('多次生成不应总是相同', () => {
-    const codes = new Set(Array.from({ length: 50 }, () => generateInviteCode()));
+    const values = [...Array(6).fill(0), ...Array(6).fill(0.5)];
+    const random = () => values.shift();
+    const codes = new Set([generateInviteCode(random), generateInviteCode(random)]);
     expect(codes.size).toBeGreaterThan(1);
   });
 });

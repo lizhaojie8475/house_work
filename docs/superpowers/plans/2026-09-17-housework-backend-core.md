@@ -2528,6 +2528,27 @@ describe('chore.update', () => {
     expect(res.chore.intervalDays).toBeNull();
   });
 
+  test('改备忘与预估耗时不动到期日', async () => {
+    const repo = baseRepo({ chores: [choreDoc()] });
+    const res = await call('chore.update', repo, 'openid-a', {
+      choreId: 'c1',
+      notes: '先倒洁厕剂静置 5 分钟',
+      estimatedMinutes: 20,
+    });
+    expect(res.chore.notes).toBe('先倒洁厕剂静置 5 分钟');
+    expect(res.chore.nextDueAt).toBe('2026-09-20');
+  });
+
+  test('重复提交相同的周期值不视为变更，不重算', async () => {
+    const repo = baseRepo({ chores: [choreDoc()] });
+    const res = await call('chore.update', repo, 'openid-a', {
+      choreId: 'c1',
+      scheduleType: 'floating',
+      intervalDays: 7,
+    });
+    expect(res.chore.nextDueAt).toBe('2026-09-20');
+  });
+
   test('跨家庭修改抛 FORBIDDEN', async () => {
     const repo = baseRepo({ chores: [choreDoc({ _id: 'c9', familyId: 'f2' })] });
     await expect(
@@ -2676,6 +2697,16 @@ async function loadOwnChore(repo, familyId, choreId) {
   return chore;
 }
 
+// 周期配置是否发生变化。fixedRule 是嵌套对象，用序列化比较足够：
+// 它的字段由 normalizeChoreInput 按固定顺序构造，不存在键序不同的同值对象。
+function scheduleChanged(before, after) {
+  return (
+    before.scheduleType !== after.scheduleType ||
+    before.intervalDays !== after.intervalDays ||
+    JSON.stringify(before.fixedRule || null) !== JSON.stringify(after.fixedRule || null)
+  );
+}
+
 function buildChoreDoc(input, { familyId, openid, now }) {
   const baseKey = resolveBaseKey({
     lastDoneAt: null,
@@ -2770,15 +2801,21 @@ async function update({ openid, payload, repo }) {
   );
 
   const { initialLastDoneKey, ...fields } = merged;
-  const baseKey = resolveBaseKey({
-    lastDoneAt: chore.lastDoneAt,
-    initialLastDoneKey: null,
-    createdAt: chore.createdAt,
-  });
-  const updated = await repo.updateChore(chore._id, {
-    ...fields,
-    nextDueAt: computeNextDueAt(fields, baseKey),
-  });
+
+  // 只有周期配置真的变了才重算到期日。对从未完成过的家务，重算基准会回落到创建日，
+  // 若改个名字也重算，到期日就会被悄悄重置成「今天 + 周期」——而从模板库导入、
+  // 未填「上次做是什么时候」的家务全部属于这一类。
+  let nextDueAt = chore.nextDueAt;
+  if (scheduleChanged(chore, fields)) {
+    const baseKey = resolveBaseKey({
+      lastDoneAt: chore.lastDoneAt,
+      initialLastDoneKey: null,
+      createdAt: chore.createdAt,
+    });
+    nextDueAt = computeNextDueAt(fields, baseKey);
+  }
+
+  const updated = await repo.updateChore(chore._id, { ...fields, nextDueAt });
   return { chore: updated };
 }
 

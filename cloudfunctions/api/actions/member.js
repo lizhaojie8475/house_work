@@ -35,15 +35,17 @@ async function addSubscribeQuota({ openid, payload, repo }) {
       `单次上报额度需为 1 到 ${MAX_QUOTA_INCREMENT} 之间的整数`
     );
   }
-  let subscribeQuota = await repo.incrementSubscribeQuota(me._id, count);
+  const subscribeQuota = await repo.incrementSubscribeQuota(me._id, count);
   if (subscribeQuota > MAX_QUOTA) {
-    // 用相对增量纠正超额，避免绝对写回覆盖并发发生的提醒扣减或额度增加。
-    subscribeQuota = await repo.incrementSubscribeQuota(
-      me._id,
-      MAX_QUOTA - subscribeQuota
-    );
+    // 仅在数据库中的当前值仍超限时绝对写回。条件更新可重复执行，
+    // 不会像相对扣减那样吸收并发额度变化或叠加多次纠偏。
+    await repo.clampSubscribeQuota(me._id, MAX_QUOTA);
   }
-  return { subscribeQuota };
+  return {
+    subscribeQuota: subscribeQuota === null
+      ? null
+      : Math.min(subscribeQuota, MAX_QUOTA),
+  };
 }
 
 async function me({ openid, repo }) {

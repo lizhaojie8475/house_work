@@ -15,6 +15,30 @@ function build(actions, openid = 'openid-a') {
 }
 
 describe('createRouter', () => {
+  test('真实 actions 注册表完整且每项都是函数', () => {
+    expect(Object.keys(actions).sort()).toEqual([
+      'chore.batchCreate',
+      'chore.create',
+      'chore.get',
+      'chore.list',
+      'chore.setArchived',
+      'chore.update',
+      'family.createOrGet',
+      'family.join',
+      'family.listMembers',
+      'family.refreshInviteCode',
+      'family.updateSettings',
+      'log.complete',
+      'log.list',
+      'log.skip',
+      'log.undo',
+      'member.addSubscribeQuota',
+      'member.me',
+      'member.updateProfile',
+    ]);
+    expect(Object.values(actions).every((handler) => typeof handler === 'function')).toBe(true);
+  });
+
   test('真实 actions 注册表可经路由端到端执行多个 action', async () => {
     const repo = createFakeRepo({
       families: [{

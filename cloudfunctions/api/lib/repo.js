@@ -95,6 +95,14 @@ function createRepo(db, command) {
       const member = firstOrNull(res);
       return member ? member.subscribeQuota : null;
     },
+    async clampSubscribeQuota(id, max) {
+      await col(COLLECTIONS.MEMBERS)
+        .where({ _id: id, subscribeQuota: command.gt(max) })
+        .update({ data: { subscribeQuota: max } });
+      const res = await col(COLLECTIONS.MEMBERS).where({ _id: id }).limit(1).get();
+      const member = firstOrNull(res);
+      return member ? member.subscribeQuota : null;
+    },
     async claimInactiveMember(memberId, patch) {
       // 条件更新：where 带上 active: false，云数据库会回报实际更新的文档数。
       // 为 0 即说明并发请求已抢先认领，这是更新路径上唯一的原子保障。
@@ -156,6 +164,7 @@ function createRepo(db, command) {
       const res = await col(COLLECTIONS.LOGS)
         .where({ choreId, type: 'done' })
         .orderBy('doneAt', 'desc')
+        .orderBy('_id', 'desc')
         .skip(0)
         .limit(limit)
         .get();

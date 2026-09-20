@@ -4,14 +4,11 @@
   "private": true,
   "description": "家务管家微信小程序",
   "scripts": {
-    "test": "jest",
+    "test": "TZ=UTC jest",
     "sync:shared": "node scripts/sync-shared.js"
   },
   "jest": {
     "testEnvironment": "node",
-    "setupFiles": [
-      "<rootDir>/jest.setup.js"
-    ],
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/cloudfunctions/.+/lib/",

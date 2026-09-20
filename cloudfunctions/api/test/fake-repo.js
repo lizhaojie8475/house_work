@@ -23,6 +23,7 @@ function createFakeRepo(seed = {}) {
 
   const clone = (doc) => (doc ? JSON.parse(JSON.stringify(doc)) : doc);
   const patchDoc = (doc, patch) => Object.assign(doc, patch);
+  const compareIdDesc = (a, b) => (a._id < b._id ? 1 : a._id > b._id ? -1 : 0);
   const createChore = async (doc) => {
     const created = { _id: nextId('c'), ...doc };
     state.chores.push(created);
@@ -89,7 +90,15 @@ function createFakeRepo(seed = {}) {
     async incrementSubscribeQuota(id, delta) {
       const doc = state.members.find((m) => m._id === id);
       if (!doc) return null;
-      doc.subscribeQuota = (doc.subscribeQuota || 0) + delta;
+      const current = doc.subscribeQuota || 0;
+      await Promise.resolve();
+      doc.subscribeQuota = current + delta;
+      return doc.subscribeQuota;
+    },
+    async clampSubscribeQuota(id, max) {
+      const doc = state.members.find((m) => m._id === id);
+      if (!doc) return null;
+      if (doc.subscribeQuota > max) doc.subscribeQuota = max;
       return doc.subscribeQuota;
     },
     // 模拟 CloudBase where({ _id, active: false }).update() 的原子条件更新语义。
@@ -142,14 +151,14 @@ function createFakeRepo(seed = {}) {
     async listLogs(choreId, { limit = 20, skip = 0 } = {}) {
       return state.logs
         .filter((l) => l.choreId === choreId)
-        .sort((a, b) => b.doneAt - a.doneAt || b._id.localeCompare(a._id))
+        .sort((a, b) => b.doneAt - a.doneAt || compareIdDesc(a, b))
         .slice(skip, skip + limit)
         .map(clone);
     },
     async listRecentDoneLogs(choreId, limit) {
       return state.logs
         .filter((l) => l.choreId === choreId && l.type === 'done')
-        .sort((a, b) => b.doneAt - a.doneAt)
+        .sort((a, b) => b.doneAt - a.doneAt || compareIdDesc(a, b))
         .slice(0, limit)
         .map(clone);
     },

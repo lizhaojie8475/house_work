@@ -497,6 +497,29 @@ describe('chore.update', () => {
     expect(res.chore.initialLastDoneKey).toBe('2026-08-15');
   });
 
+  test.each(['', null])('上次完成日显式提交 %p 时拒绝更新且不重置到期日', async (initialLastDoneKey) => {
+    const repo = baseRepo({
+      chores: [
+        choreDoc({
+          initialLastDoneKey: '2026-08-01',
+          intervalDays: 30,
+          nextDueAt: '2026-08-31',
+        }),
+      ],
+    });
+
+    await expect(
+      call('chore.update', repo, 'openid-a', {
+        choreId: 'c1',
+        initialLastDoneKey,
+      })
+    ).rejects.toMatchObject({ code: CODES.INVALID_ARGUMENT });
+    expect(repo._state.chores[0]).toMatchObject({
+      initialLastDoneKey: '2026-08-01',
+      nextDueAt: '2026-08-31',
+    });
+  });
+
   test('切换周期类型会重算到期日', async () => {
     const repo = baseRepo({
       chores: [choreDoc({ lastDoneAt: Date.UTC(2026, 8, 13, 4, 0) })],

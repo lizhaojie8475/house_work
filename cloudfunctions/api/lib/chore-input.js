@@ -88,7 +88,7 @@ function normalizeChoreInput(raw, { defaultReminderLeadDays }) {
     normalized.fixedRule = canonicalizeFixedRule(raw.fixedRule);
   }
 
-  if (raw.initialLastDoneKey) {
+  if (Object.prototype.hasOwnProperty.call(raw, 'initialLastDoneKey')) {
     const key = String(raw.initialLastDoneKey);
     if (!DATE_KEY_RE.test(key)) {
       throw appError(CODES.INVALID_ARGUMENT, '上次完成日格式应为 2026-09-17');

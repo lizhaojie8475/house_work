@@ -11,6 +11,11 @@ const {
 } = require('./date');
 
 describe('TZ_OFFSET_MS', () => {
+  test('Jest 进程固定运行在 UTC', () => {
+    expect(new Date().getTimezoneOffset()).toBe(0);
+    expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe('UTC');
+  });
+
   test('固定为 UTC+8', () => {
     expect(TZ_OFFSET_MS).toBe(8 * 60 * 60 * 1000);
   });

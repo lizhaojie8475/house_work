@@ -116,18 +116,23 @@ async function update({ openid, payload, repo }) {
   const family = await repo.getFamily(member.familyId);
 
   const { choreId, ...patch } = payload;
+  const mergedInput = {
+    name: chore.name,
+    icon: chore.icon,
+    room: chore.room,
+    scheduleType: chore.scheduleType,
+    intervalDays: chore.intervalDays,
+    fixedRule: chore.fixedRule,
+    estimatedMinutes: chore.estimatedMinutes,
+    notes: chore.notes,
+    reminderLeadDays: chore.reminderLeadDays,
+  };
+  if (chore.initialLastDoneKey) {
+    mergedInput.initialLastDoneKey = chore.initialLastDoneKey;
+  }
   const merged = normalizeChoreInput(
     {
-      name: chore.name,
-      icon: chore.icon,
-      room: chore.room,
-      scheduleType: chore.scheduleType,
-      intervalDays: chore.intervalDays,
-      fixedRule: chore.fixedRule,
-      estimatedMinutes: chore.estimatedMinutes,
-      notes: chore.notes,
-      reminderLeadDays: chore.reminderLeadDays,
-      initialLastDoneKey: chore.initialLastDoneKey,
+      ...mergedInput,
       ...patch,
     },
     { defaultReminderLeadDays: family.settings.defaultReminderLeadDays }

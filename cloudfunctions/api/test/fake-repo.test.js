@@ -99,18 +99,23 @@ describe('createFakeRepo', () => {
   test('相同完成时间按 id 倒序稳定分页', async () => {
     const repo = createFakeRepo({
       logs: [
-        { _id: 'l1', choreId: 'c1', doneAt: 1 },
-        { _id: 'l3', choreId: 'c1', doneAt: 1 },
-        { _id: 'l2', choreId: 'c1', doneAt: 1 },
+        { _id: 'B', choreId: 'c1', doneAt: 1, type: 'done' },
+        { _id: 'a', choreId: 'c1', doneAt: 1, type: 'done' },
+        { _id: 'A', choreId: 'c1', doneAt: 1, type: 'done' },
       ],
     });
 
     await expect(repo.listLogs('c1', { limit: 2 })).resolves.toEqual([
-      expect.objectContaining({ _id: 'l3' }),
-      expect.objectContaining({ _id: 'l2' }),
+      expect.objectContaining({ _id: 'a' }),
+      expect.objectContaining({ _id: 'B' }),
     ]);
     await expect(repo.listLogs('c1', { limit: 2, skip: 2 })).resolves.toEqual([
-      expect.objectContaining({ _id: 'l1' }),
+      expect.objectContaining({ _id: 'A' }),
+    ]);
+    await expect(repo.listRecentDoneLogs('c1', 3)).resolves.toEqual([
+      expect.objectContaining({ _id: 'a' }),
+      expect.objectContaining({ _id: 'B' }),
+      expect.objectContaining({ _id: 'A' }),
     ]);
   });
 });

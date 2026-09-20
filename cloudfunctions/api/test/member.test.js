@@ -88,6 +88,17 @@ describe('member.addSubscribeQuota', () => {
     expect(res.subscribeQuota).toBe(200);
   });
 
+  test('并发累加接近上限时最终额度恰好为 200', async () => {
+    const repo = baseRepo(member({ subscribeQuota: 195 }));
+    const results = await Promise.all([
+      call('member.addSubscribeQuota', repo, 'openid-a', { count: 20 }),
+      call('member.addSubscribeQuota', repo, 'openid-a', { count: 20 }),
+    ]);
+
+    expect(repo._state.members[0].subscribeQuota).toBe(200);
+    expect(results.every(({ subscribeQuota }) => subscribeQuota <= 200)).toBe(true);
+  });
+
   test('count 为 0 抛 INVALID_ARGUMENT', async () => {
     const repo = baseRepo();
     await expect(

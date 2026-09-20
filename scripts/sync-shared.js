@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ALL_FILES = ['date.js', 'schedule.js', 'urgency.js'];
+const ALL_FILES = ['date.js', 'schedule.js', 'urgency.js', 'repo.js'];
 
 const TARGETS = [
   { dir: 'cloudfunctions/api/lib', files: ALL_FILES },

@@ -12,9 +12,9 @@ describe('TARGETS 分发清单', () => {
     ]);
   });
 
-  test('云函数拿到完整三个文件', () => {
-    expect(TARGETS[0].files).toEqual(['date.js', 'schedule.js', 'urgency.js']);
-    expect(TARGETS[1].files).toEqual(['date.js', 'schedule.js', 'urgency.js']);
+  test('云函数拿到完整四个文件', () => {
+    expect(TARGETS[0].files).toEqual(['date.js', 'schedule.js', 'urgency.js', 'repo.js']);
+    expect(TARGETS[1].files).toEqual(['date.js', 'schedule.js', 'urgency.js', 'repo.js']);
   });
 
   test('小程序不同步 schedule.js，周期计算只在云函数执行', () => {

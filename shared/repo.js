@@ -10,10 +10,35 @@ const COLLECTIONS = {
   REMINDER_SENDS: 'reminder_sends',
 };
 
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 1000;
+
 function createRepo(db, command) {
   const col = (name) => db.collection(name);
 
   const firstOrNull = (res) => (res.data && res.data.length > 0 ? res.data[0] : null);
+
+  const listAll = async (collectionName, filter, methodName) => {
+    const results = [];
+
+    for (let page = 0; page < MAX_PAGES; page += 1) {
+      const res = await col(collectionName)
+        .where(filter)
+        .orderBy('_id', 'asc')
+        .skip(page * PAGE_SIZE)
+        .limit(PAGE_SIZE)
+        .get();
+      results.push(...res.data);
+      if (res.data.length < PAGE_SIZE) return results;
+    }
+
+    console.error(`[repo-pagination] ${methodName} reached page cap; returning partial results`, {
+      filter,
+      pageSize: PAGE_SIZE,
+      maxPages: MAX_PAGES,
+    });
+    return results;
+  };
 
   return {
     // families
@@ -38,11 +63,8 @@ function createRepo(db, command) {
       return Boolean(res.stats && res.stats.removed > 0);
     },
     async listFamiliesByReminderHour(hour) {
-      const res = await col(COLLECTIONS.FAMILIES)
-        .where({ 'settings.reminderHour': hour })
-        .limit(1000)
-        .get();
-      return res.data;
+      const filter = { 'settings.reminderHour': hour };
+      return listAll(COLLECTIONS.FAMILIES, filter, 'listFamiliesByReminderHour');
     },
 
     // members
@@ -55,11 +77,8 @@ function createRepo(db, command) {
       return firstOrNull(res);
     },
     async listMembers(familyId) {
-      const res = await col(COLLECTIONS.MEMBERS)
-        .where({ familyId, active: true })
-        .limit(50)
-        .get();
-      return res.data;
+      const filter = { familyId, active: true };
+      return listAll(COLLECTIONS.MEMBERS, filter, 'listMembers');
     },
     async updateMember(id, patch) {
       await col(COLLECTIONS.MEMBERS).doc(id).update({ data: patch });
@@ -97,19 +116,15 @@ function createRepo(db, command) {
     async listChores(familyId, { archived = false, room = null } = {}) {
       const where = { familyId, archived };
       if (room) where.room = room;
-      const res = await col(COLLECTIONS.CHORES).where(where).limit(500).get();
-      return res.data;
+      return listAll(COLLECTIONS.CHORES, where, 'listChores');
     },
     async updateChore(id, patch) {
       await col(COLLECTIONS.CHORES).doc(id).update({ data: patch });
       return this.getChore(id);
     },
     async listDueChores(familyId, maxDueKey) {
-      const res = await col(COLLECTIONS.CHORES)
-        .where({ familyId, archived: false, nextDueAt: command.lte(maxDueKey) })
-        .limit(500)
-        .get();
-      return res.data;
+      const filter = { familyId, archived: false, nextDueAt: command.lte(maxDueKey) };
+      return listAll(COLLECTIONS.CHORES, filter, 'listDueChores');
     },
 
     // chore_logs
@@ -136,8 +151,8 @@ function createRepo(db, command) {
       return res.data;
     },
     async deleteLog(id) {
-      await col(COLLECTIONS.LOGS).doc(id).remove();
-      return true;
+      const res = await col(COLLECTIONS.LOGS).doc(id).remove();
+      return Boolean(res.stats && res.stats.removed > 0);
     },
 
     // reminder_sends

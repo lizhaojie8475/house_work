@@ -2,6 +2,7 @@
 const family = require('./family');
 const chore = require('./chore');
 const log = require('./log');
+const member = require('./member');
 
 module.exports = {
   'family.createOrGet': family['family.createOrGet'],
@@ -21,4 +22,8 @@ module.exports = {
   'log.undo': log['log.undo'],
   'log.skip': log['log.skip'],
   'log.list': log['log.list'],
+
+  'member.updateProfile': member['member.updateProfile'],
+  'member.addSubscribeQuota': member['member.addSubscribeQuota'],
+  'member.me': member['member.me'],
 };

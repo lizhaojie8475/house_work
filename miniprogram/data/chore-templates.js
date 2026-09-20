@@ -5,7 +5,7 @@ const ROOMS = ['厨房', '卫生间', '卧室', '客厅', '阳台', '全屋'];
 const CHORE_TEMPLATES = [
   // 厨房
   { id: 'kitchen-hood', name: '洗油烟机', icon: '🔥', room: '厨房', scheduleType: 'floating', intervalDays: 90, estimatedMinutes: 60, notes: '先拆滤网泡热水加洗涤剂，扇叶用专用清洁剂喷后静置 10 分钟' },
-  { id: 'kitchen-sink-drain', name: '疏通厨房下水道', icon: '🚰', room: '厨房', scheduleType: 'floating', intervalDays: 60, estimatedMinutes: 20, notes: '倒管道疏通剂后静置 30 分钟再冲热水' },
+  { id: 'kitchen-sink-drain', name: '疏通厨房下水道', icon: '🚰', room: '厨房', scheduleType: 'floating', intervalDays: 60, estimatedMinutes: 20, notes: '倒管道疏通剂后静置 30 分钟，再用大量常温清水冲净；强碱疏通剂遇热水易回溅' },
   { id: 'kitchen-fridge', name: '清理冰箱', icon: '🧊', room: '厨房', scheduleType: 'floating', intervalDays: 30, estimatedMinutes: 40, notes: '清过期食品，隔板取出用小苏打水擦' },
   { id: 'kitchen-microwave', name: '清洁微波炉', icon: '📻', room: '厨房', scheduleType: 'floating', intervalDays: 30, estimatedMinutes: 15, notes: '一碗水加柠檬片高火 3 分钟，蒸汽软化油污后擦拭' },
   { id: 'kitchen-dishwasher', name: '洗碗机自清洁', icon: '🍽️', room: '厨房', scheduleType: 'floating', intervalDays: 30, estimatedMinutes: 10, notes: '清滤网残渣，放专用清洁剂跑一次空载高温程序' },
@@ -27,7 +27,7 @@ const CHORE_TEMPLATES = [
   { id: 'bed-sheets', name: '换床单', icon: '🛏️', room: '卧室', scheduleType: 'fixed', fixedRule: { type: 'weekly', weekdays: [0] }, estimatedMinutes: 20, notes: '' },
   { id: 'bed-pillow', name: '洗枕套与枕芯', icon: '🛌', room: '卧室', scheduleType: 'floating', intervalDays: 30, estimatedMinutes: 30, notes: '枕芯查看洗标，多数可低温机洗后彻底晾干' },
   { id: 'bed-quilt-sun', name: '晒被子', icon: '☀️', room: '卧室', scheduleType: 'floating', intervalDays: 30, estimatedMinutes: 20, notes: '选晴天上午 10 点到下午 3 点' },
-  { id: 'bed-mattress', name: '翻转除螨床垫', icon: '🧹', room: '卧室', scheduleType: 'floating', intervalDays: 90, estimatedMinutes: 40, notes: '吸尘后撒小苏打静置 1 小时再吸走' },
+  { id: 'bed-mattress', name: '翻转除螨床垫', icon: '🧹', room: '卧室', scheduleType: 'floating', intervalDays: 90, estimatedMinutes: 40, notes: '吸尘后撒小苏打静置 1 小时再吸走；先看标签是否可翻面，单面床垫只调头不翻转' },
   { id: 'bed-wardrobe', name: '整理换季衣物', icon: '👕', room: '卧室', scheduleType: 'fixed', fixedRule: { type: 'yearly', month: 4, dayOfMonth: 15 }, estimatedMinutes: 120, notes: '收纳前彻底晾干，放防虫片' },
 
   // 客厅

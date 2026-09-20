@@ -3711,6 +3711,13 @@ Expected: FAIL，报错 `Cannot find module '../../../shared/repo'`
 
 - [ ] **Step 3: 实现云数据库 repo**
 
+> **实现修正（审查后）**：下方代码中四个列表方法（`listFamiliesByReminderHour`、`listMembers`、
+> `listChores`、`listDueChores`）写的是单次查询加固定 `.limit(...)`，这会在数据超过上限时**静默截断**，
+> 调用方无法区分「就这么多」和「这只是第一页」。最危险的是 `listFamiliesByReminderHour`——提醒任务
+> 靠它扫描全系统家庭，一旦同一提醒时段的家庭超过上限，超出部分会永久收不到提醒且毫无报错。
+> 最终实现改为按 `_id` 升序稳定分页取完，并设页数上限与超限日志。`deleteLog` 也改为依据
+> `stats.removed` 返回真实布尔值，与假 repo 的契约一致。
+
 创建 `shared/repo.js`：
 
 ```js

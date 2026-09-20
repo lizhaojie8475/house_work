@@ -4776,6 +4776,13 @@ Expected: 项目成功打开，左侧目录树可见 `cloudfunctions` 与 `minip
 | `chore_logs` | `chore_done` | `choreId` 升序、`doneAt` 降序 | 否 |
 | `families` | `invite_code` | `inviteCode` 升序 | 是 |
 | `reminder_sends` | `openid_date` | `openid` 升序、`dateKey` 升序 | 是 |
+| `families` | `reminder_hour_id` | `settings.reminderHour` 升序、`_id` 升序 | 否 |
+| `chores` | `family_active_id` | `familyId` 升序、`archived` 升序、`_id` 升序 | 否 |
+| `members` | `family_active_id` | `familyId` 升序、`active` 升序、`_id` 升序 | 否 |
+
+后三个索引是为分页加的。repository 的四个列表方法按 `_id` 升序稳定分页取全量（没有稳定排序，
+`skip` 推进时会重复或漏掉记录），而 `where` 条件加 `_id` 排序需要相应的复合索引才能走索引排序，
+否则数据库会退化为内存排序。家庭级数据量下内存排序也能跑，所以这三条是预防性的。
 
 把这份表格连同操作说明写入 `docs/db-setup.md`，内容如下：
 

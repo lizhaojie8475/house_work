@@ -174,6 +174,25 @@ describe('log.undo', () => {
     expect(repo._state.logs).toHaveLength(0);
   });
 
+  test('回填家务完成后撤销仍以上次完成日为基准', async () => {
+    const repo = baseRepo({
+      chores: [
+        choreDoc({
+          createdAt: Date.UTC(2026, 8, 20),
+          initialLastDoneKey: '2026-08-01',
+          intervalDays: 30,
+          nextDueAt: '2026-08-31',
+        }),
+      ],
+    });
+    const doneAt = Date.now() - 1000;
+    await call('log.complete', repo, 'openid-a', { choreId: 'c1', doneAt });
+    const res = await call('log.undo', repo, 'openid-a', { choreId: 'c1' });
+
+    expect(res.chore.lastDoneAt).toBeNull();
+    expect(res.chore.nextDueAt).toBe('2026-08-31');
+  });
+
   test('撤销后回滚到上一条完成记录', async () => {
     const repo = baseRepo({ chores: [choreDoc()] });
     const first = Date.UTC(2026, 8, 3, 4, 0);  // 北京 09-03

@@ -25,7 +25,7 @@ const CHORE_TEMPLATES = [
 
   // 卧室
   { id: 'bed-sheets', name: '换床单', icon: '🛏️', room: '卧室', scheduleType: 'fixed', fixedRule: { type: 'weekly', weekdays: [0] }, estimatedMinutes: 20, notes: '' },
-  { id: 'bed-pillow', name: '洗枕套与枕芯', icon: '🛌', room: '卧室', scheduleType: 'floating', intervalDays: 30, estimatedMinutes: 30, notes: '枕芯查看洗标，多数可低温机洗后彻底晾干' },
+  { id: 'bed-pillow', name: '洗枕套与枕芯', icon: '🛌', room: '卧室', scheduleType: 'floating', intervalDays: 7, estimatedMinutes: 30, notes: '枕套建议与床单每周换洗；枕芯按洗标和实际需要清洗，多数可低温机洗后彻底晾干' },
   { id: 'bed-quilt-sun', name: '晒被子', icon: '☀️', room: '卧室', scheduleType: 'floating', intervalDays: 30, estimatedMinutes: 20, notes: '选晴天上午 10 点到下午 3 点' },
   { id: 'bed-mattress', name: '翻转除螨床垫', icon: '🧹', room: '卧室', scheduleType: 'floating', intervalDays: 90, estimatedMinutes: 40, notes: '吸尘后撒小苏打静置 1 小时再吸走；先看标签是否可翻面，单面床垫只调头不翻转' },
   { id: 'bed-wardrobe', name: '整理换季衣物', icon: '👕', room: '卧室', scheduleType: 'fixed', fixedRule: { type: 'yearly', month: 4, dayOfMonth: 15 }, estimatedMinutes: 120, notes: '收纳前彻底晾干，放防虫片' },

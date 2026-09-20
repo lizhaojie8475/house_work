@@ -78,4 +78,39 @@ describe('createFakeRepo', () => {
     expect(created.map((chore) => chore.title)).toEqual(['扫地', '拖地']);
     expect(repo._state.chores).toHaveLength(2);
   });
+
+  test('归档筛选与真实仓储一样要求字段精确匹配', async () => {
+    const repo = createFakeRepo({
+      chores: [
+        { _id: 'c1', familyId: 'f1', archived: false, nextDueAt: '2026-09-17' },
+        { _id: 'c2', familyId: 'f1', archived: true, nextDueAt: '2026-09-17' },
+        { _id: 'c3', familyId: 'f1', nextDueAt: '2026-09-17' },
+      ],
+    });
+
+    await expect(repo.listChores('f1')).resolves.toEqual([
+      expect.objectContaining({ _id: 'c1' }),
+    ]);
+    await expect(repo.listDueChores('f1', '2026-09-17')).resolves.toEqual([
+      expect.objectContaining({ _id: 'c1' }),
+    ]);
+  });
+
+  test('相同完成时间按 id 倒序稳定分页', async () => {
+    const repo = createFakeRepo({
+      logs: [
+        { _id: 'l1', choreId: 'c1', doneAt: 1 },
+        { _id: 'l3', choreId: 'c1', doneAt: 1 },
+        { _id: 'l2', choreId: 'c1', doneAt: 1 },
+      ],
+    });
+
+    await expect(repo.listLogs('c1', { limit: 2 })).resolves.toEqual([
+      expect.objectContaining({ _id: 'l3' }),
+      expect.objectContaining({ _id: 'l2' }),
+    ]);
+    await expect(repo.listLogs('c1', { limit: 2, skip: 2 })).resolves.toEqual([
+      expect.objectContaining({ _id: 'l1' }),
+    ]);
+  });
 });

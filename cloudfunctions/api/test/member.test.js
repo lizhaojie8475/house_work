@@ -47,6 +47,12 @@ describe('member.updateProfile', () => {
     expect(res.member.avatarUrl).toBe('https://example.com/old.png');
   });
 
+  test('头像显式传 null 时保存为空字符串', async () => {
+    const repo = baseRepo(member({ avatarUrl: 'https://example.com/old.png' }));
+    const res = await call('member.updateProfile', repo, 'openid-a', { avatarUrl: null });
+    expect(res.member.avatarUrl).toBe('');
+  });
+
   test('昵称为空白抛 INVALID_ARGUMENT', async () => {
     const repo = baseRepo();
     await expect(

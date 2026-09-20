@@ -107,6 +107,7 @@
 | `estimatedMinutes` | number | 预估耗时（分钟） |
 | `notes` | string | SOP 备忘，如「用筒自洁模式，投 1 包清洁剂」 |
 | `reminderLeadDays` | number | 提前几天开始推送提醒 |
+| `initialLastDoneKey` | string \| null | 创建或编辑时填写的初始上次完成日；无完成流水时作为排期基准 |
 | `lastDoneAt` | number \| null | 上次完成时间戳，冗余字段 |
 | `lastDoneBy` | string \| null | 上次完成人 openid，冗余字段 |
 | `nextDueAt` | string | 下次到期的本地日历日，格式 `YYYY-MM-DD`，冗余字段 |

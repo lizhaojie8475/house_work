@@ -2,7 +2,7 @@ const { appError, CODES } = require('../lib/errors');
 const { requireMember } = require('../lib/auth');
 const { loadOwnChore } = require('./chore');
 const { resolveBaseKey, computeNextDueAt } = require('../lib/schedule');
-const { toLocalDateKey, todayKey } = require('../lib/date');
+const { todayKey } = require('../lib/date');
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -15,7 +15,7 @@ function deriveFromLogs(chore, doneLogs) {
   const lastDoneBy = latest ? latest.doneBy : null;
   const baseKey = resolveBaseKey({
     lastDoneAt,
-    initialLastDoneKey: null,
+    initialLastDoneKey: chore.initialLastDoneKey,
     createdAt: chore.createdAt,
   });
   return { lastDoneAt, lastDoneBy, nextDueAt: computeNextDueAt(chore, baseKey) };

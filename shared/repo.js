@@ -85,6 +85,14 @@ function createRepo(db, command) {
       const res = await col(COLLECTIONS.MEMBERS).where({ _id: id }).limit(1).get();
       return firstOrNull(res);
     },
+    async incrementSubscribeQuota(id, delta) {
+      await col(COLLECTIONS.MEMBERS).doc(id).update({
+        data: { subscribeQuota: command.inc(delta) },
+      });
+      const res = await col(COLLECTIONS.MEMBERS).where({ _id: id }).limit(1).get();
+      const member = firstOrNull(res);
+      return member ? member.subscribeQuota : null;
+    },
     async claimInactiveMember(memberId, patch) {
       // 条件更新：where 带上 active: false，云数据库会回报实际更新的文档数。
       // 为 0 即说明并发请求已抢先认领，这是更新路径上唯一的原子保障。
@@ -136,6 +144,7 @@ function createRepo(db, command) {
       const res = await col(COLLECTIONS.LOGS)
         .where({ choreId })
         .orderBy('doneAt', 'desc')
+        .orderBy('_id', 'desc')
         .skip(skip)
         .limit(limit)
         .get();
@@ -156,6 +165,7 @@ function createRepo(db, command) {
     },
 
     // reminder_sends
+    // 原子 recordReminderSent 认领已取代预检查；保留此方法供兼容和诊断使用。
     async hasSentReminder(openid, dateKey) {
       const res = await col(COLLECTIONS.REMINDER_SENDS)
         .where({ openid, dateKey })

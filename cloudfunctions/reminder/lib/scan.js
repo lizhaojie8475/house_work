@@ -8,6 +8,8 @@ function localHourOf(now) {
   return new Date(now + TZ_OFFSET_MS).getUTCHours();
 }
 
+// 同类识别器也存在于 cloudfunctions/api/lib/db-conflict.js；错误形态来自外部
+// CloudBase SDK，SDK 变化时必须同步更新两处（云函数需各自独立打包）。
 function isDuplicateKeyError(err) {
   return Boolean(
     err &&
@@ -118,7 +120,7 @@ async function runReminderScan({ repo, sender, now = Date.now(), logger = consol
         }
 
         try {
-          await repo.updateMember(member._id, { subscribeQuota: member.subscribeQuota - 1 });
+          await repo.incrementSubscribeQuota(member._id, -1);
         } catch (err) {
           // 消息已经发出，不能把持久化故障误判为授权失效并清零用户累积额度。
           logFailure(

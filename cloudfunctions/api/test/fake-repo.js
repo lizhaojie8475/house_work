@@ -86,6 +86,12 @@ function createFakeRepo(seed = {}) {
       if (!doc) return null;
       return clone(patchDoc(doc, patch));
     },
+    async incrementSubscribeQuota(id, delta) {
+      const doc = state.members.find((m) => m._id === id);
+      if (!doc) return null;
+      doc.subscribeQuota = (doc.subscribeQuota || 0) + delta;
+      return doc.subscribeQuota;
+    },
     // 模拟 CloudBase where({ _id, active: false }).update() 的原子条件更新语义。
     // 真实实现必须保留 where 上的 active: false 条件并据实际更新文档数判断成败，
     // 绝不可退化为无条件的 doc(id).update()——唯一索引只约束插入，
@@ -107,7 +113,7 @@ function createFakeRepo(seed = {}) {
     async listChores(familyId, { archived = false, room = null } = {}) {
       return state.chores
         .filter((c) => c.familyId === familyId)
-        .filter((c) => Boolean(c.archived) === archived)
+        .filter((c) => c.archived === archived)
         .filter((c) => (room ? c.room === room : true))
         .map(clone);
     },
@@ -118,7 +124,12 @@ function createFakeRepo(seed = {}) {
     },
     async listDueChores(familyId, maxDueKey) {
       return state.chores
-        .filter((c) => c.familyId === familyId && !c.archived && c.nextDueAt <= maxDueKey)
+        .filter(
+          (c) =>
+            c.familyId === familyId &&
+            c.archived === false &&
+            c.nextDueAt <= maxDueKey
+        )
         .map(clone);
     },
 
@@ -131,7 +142,7 @@ function createFakeRepo(seed = {}) {
     async listLogs(choreId, { limit = 20, skip = 0 } = {}) {
       return state.logs
         .filter((l) => l.choreId === choreId)
-        .sort((a, b) => b.doneAt - a.doneAt)
+        .sort((a, b) => b.doneAt - a.doneAt || b._id.localeCompare(a._id))
         .slice(skip, skip + limit)
         .map(clone);
     },
@@ -150,6 +161,7 @@ function createFakeRepo(seed = {}) {
     },
 
     // reminder_sends
+    // 原子 recordReminderSent 认领已取代预检查；保留此方法供兼容和诊断使用。
     async hasSentReminder(openid, dateKey) {
       return state.reminderSends.some((r) => r.openid === openid && r.dateKey === dateKey);
     },

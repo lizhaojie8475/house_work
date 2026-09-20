@@ -27,7 +27,12 @@ exports.main = async () => {
     console.error('[reminder] REMINDER_TEMPLATE_ID 未配置，跳过本次扫描');
     return { ok: false, reason: 'missing template id' };
   }
-  const stats = await runReminderScan({ repo, sender, now: Date.now(), logger: console });
-  console.log('[reminder] scan finished', stats);
-  return { ok: true, stats };
+  try {
+    const stats = await runReminderScan({ repo, sender, now: Date.now(), logger: console });
+    console.log('[reminder] scan finished', stats);
+    return { ok: true, stats };
+  } catch (err) {
+    console.error('[reminder] scan failed', err);
+    return { ok: false, reason: 'scan failed' };
+  }
 };

@@ -71,6 +71,7 @@ describe('chore.create', () => {
     expect(res.chore.createdBy).toBe('openid-a');
     expect(res.chore.archived).toBe(false);
     expect(res.chore.lastDoneAt).toBeNull();
+    expect(res.chore.initialLastDoneKey).toBe('2026-09-01');
   });
 
   test('创建固定日历家务', async () => {
@@ -457,6 +458,43 @@ describe('chore.update', () => {
       intervalDays: 14,
     });
     expect(res.chore.nextDueAt).toBe('2026-09-27');
+  });
+
+  test('从未完成的回填家务改周期时仍以上次完成日为基准', async () => {
+    const repo = baseRepo({
+      chores: [
+        choreDoc({
+          createdAt: Date.UTC(2026, 8, 20),
+          initialLastDoneKey: '2026-08-01',
+          intervalDays: 30,
+          nextDueAt: '2026-08-31',
+        }),
+      ],
+    });
+    const res = await call('chore.update', repo, 'openid-a', {
+      choreId: 'c1',
+      intervalDays: 60,
+    });
+    expect(res.chore.nextDueAt).toBe('2026-09-30');
+    expect(res.chore.initialLastDoneKey).toBe('2026-08-01');
+  });
+
+  test('可修改上次完成日并按新基准重算到期日', async () => {
+    const repo = baseRepo({
+      chores: [
+        choreDoc({
+          initialLastDoneKey: '2026-08-01',
+          intervalDays: 30,
+          nextDueAt: '2026-08-31',
+        }),
+      ],
+    });
+    const res = await call('chore.update', repo, 'openid-a', {
+      choreId: 'c1',
+      initialLastDoneKey: '2026-08-15',
+    });
+    expect(res.chore.nextDueAt).toBe('2026-09-14');
+    expect(res.chore.initialLastDoneKey).toBe('2026-08-15');
   });
 
   test('切换周期类型会重算到期日', async () => {

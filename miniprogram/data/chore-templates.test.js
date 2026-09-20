@@ -71,6 +71,13 @@ describe('CHORE_TEMPLATES', () => {
     expect(CHORE_TEMPLATES.some((t) => t.scheduleType === 'fixed')).toBe(true);
     expect(CHORE_TEMPLATES.some((t) => t.scheduleType === 'floating')).toBe(true);
   });
+
+  test('枕套按每周清洗建议配置并区分枕芯说明', () => {
+    const template = CHORE_TEMPLATES.find((t) => t.id === 'bed-pillow');
+    expect(template.intervalDays).toBe(7);
+    expect(template.notes).toContain('枕套');
+    expect(template.notes).toContain('枕芯');
+  });
 });
 
 describe('templatesByRoom', () => {

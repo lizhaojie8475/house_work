@@ -15,7 +15,7 @@ async function updateProfile({ openid, payload, repo }) {
     patch.nickname = nickname;
   }
   if (payload.avatarUrl !== undefined) {
-    patch.avatarUrl = String(payload.avatarUrl).slice(0, 500);
+    patch.avatarUrl = String(payload.avatarUrl || '').slice(0, 500);
   }
 
   const updated = Object.keys(patch).length > 0
@@ -35,8 +35,14 @@ async function addSubscribeQuota({ openid, payload, repo }) {
       `单次上报额度需为 1 到 ${MAX_QUOTA_INCREMENT} 之间的整数`
     );
   }
-  const subscribeQuota = Math.min(MAX_QUOTA, (me.subscribeQuota || 0) + count);
-  await repo.updateMember(me._id, { subscribeQuota });
+  let subscribeQuota = await repo.incrementSubscribeQuota(me._id, count);
+  if (subscribeQuota > MAX_QUOTA) {
+    // 用相对增量纠正超额，避免绝对写回覆盖并发发生的提醒扣减或额度增加。
+    subscribeQuota = await repo.incrementSubscribeQuota(
+      me._id,
+      MAX_QUOTA - subscribeQuota
+    );
+  }
   return { subscribeQuota };
 }
 

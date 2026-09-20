@@ -1,5 +1,6 @@
 const { runReminderScan } = require('../lib/scan');
 const { createFakeRepo } = require('../../api/test/fake-repo');
+const actions = require('../../api/actions');
 
 const noopLogger = { info: () => {}, error: () => {} };
 // 北京 2026-09-17 08:30，本地小时为 8
@@ -100,6 +101,25 @@ describe('runReminderScan', () => {
     expect(repo._state.members[0].subscribeQuota).toBe(4);
     expect(repo._state.reminderSends).toHaveLength(1);
     expect(repo._state.reminderSends[0].dateKey).toBe('2026-09-17');
+  });
+
+  test('发送期间并发增加的订阅额度不会被扣减写回覆盖', async () => {
+    const repo = createFakeRepo({
+      families: [family()],
+      members: [member({ subscribeQuota: 5 })],
+      chores: [chore()],
+    });
+    const sender = async () => {
+      await actions['member.addSubscribeQuota']({
+        openid: 'openid-a',
+        payload: { count: 1 },
+        repo,
+      });
+    };
+
+    await runReminderScan({ repo, sender, now: NOW, logger: noopLogger });
+
+    expect(repo._state.members[0].subscribeQuota).toBe(5);
   });
 
   test('同一天重复运行不会重复发送', async () => {
@@ -273,7 +293,7 @@ describe('runReminderScan', () => {
       members: [member({ subscribeQuota: 5 })],
       chores: [chore()],
     });
-    repo.updateMember = async () => {
+    repo.incrementSubscribeQuota = async () => {
       throw new Error('member storage unavailable');
     };
     const sender = createSender();

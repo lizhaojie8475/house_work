@@ -29,7 +29,8 @@ function scheduleChanged(before, after) {
   return (
     before.scheduleType !== after.scheduleType ||
     before.intervalDays !== after.intervalDays ||
-    JSON.stringify(before.fixedRule || null) !== JSON.stringify(after.fixedRule || null)
+    JSON.stringify(before.fixedRule || null) !== JSON.stringify(after.fixedRule || null) ||
+    (before.initialLastDoneKey || null) !== (after.initialLastDoneKey || null)
   );
 }
 
@@ -39,13 +40,12 @@ function buildChoreDoc(input, { familyId, openid, now }) {
     initialLastDoneKey: input.initialLastDoneKey,
     createdAt: now,
   });
-  const { initialLastDoneKey, ...fields } = input;
   return {
-    ...fields,
+    ...input,
     familyId,
     lastDoneAt: null,
     lastDoneBy: null,
-    nextDueAt: computeNextDueAt(fields, baseKey),
+    nextDueAt: computeNextDueAt(input, baseKey),
     archived: false,
     createdAt: now,
     createdBy: openid,
@@ -127,27 +127,27 @@ async function update({ openid, payload, repo }) {
       estimatedMinutes: chore.estimatedMinutes,
       notes: chore.notes,
       reminderLeadDays: chore.reminderLeadDays,
+      initialLastDoneKey: chore.initialLastDoneKey,
       ...patch,
     },
     { defaultReminderLeadDays: family.settings.defaultReminderLeadDays }
   );
 
-  const { initialLastDoneKey, ...fields } = merged;
-
-  // 只有周期配置真的变了才重算到期日。对从未完成过的家务，重算基准会回落到创建日，
+  // 只有周期配置或初始上次完成日真的变了才重算到期日。对从未完成过的家务，
+  // 重算基准会依次回落到 initialLastDoneKey、创建日，
   // 若改个名字也重算，到期日就会被悄悄重置成「今天 + 周期」——而从模板库导入、
   // 未填「上次做是什么时候」的家务全部属于这一类。
   let nextDueAt = chore.nextDueAt;
-  if (scheduleChanged(chore, fields)) {
+  if (scheduleChanged(chore, merged)) {
     const baseKey = resolveBaseKey({
       lastDoneAt: chore.lastDoneAt,
-      initialLastDoneKey: null,
+      initialLastDoneKey: merged.initialLastDoneKey,
       createdAt: chore.createdAt,
     });
-    nextDueAt = computeNextDueAt(fields, baseKey);
+    nextDueAt = computeNextDueAt(merged, baseKey);
   }
 
-  const updated = await repo.updateChore(chore._id, { ...fields, nextDueAt });
+  const updated = await repo.updateChore(chore._id, { ...merged, nextDueAt });
   return { chore: updated };
 }
 

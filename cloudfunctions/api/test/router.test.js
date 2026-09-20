@@ -1,5 +1,7 @@
 const { createRouter } = require('../lib/router');
 const { appError, CODES } = require('../lib/errors');
+const actions = require('../actions');
+const { createFakeRepo } = require('./fake-repo');
 
 const noopLogger = { error: () => {} };
 
@@ -13,6 +15,44 @@ function build(actions, openid = 'openid-a') {
 }
 
 describe('createRouter', () => {
+  test('真实 actions 注册表可经路由端到端执行多个 action', async () => {
+    const repo = createFakeRepo({
+      families: [{
+        _id: 'f1',
+        name: '我的家',
+        settings: { reminderHour: 8, defaultReminderLeadDays: 1 },
+      }],
+      members: [{
+        _id: 'm1',
+        familyId: 'f1',
+        openid: 'openid-a',
+        active: true,
+      }],
+      chores: [{
+        _id: 'c1',
+        familyId: 'f1',
+        name: '刷马桶',
+        archived: false,
+        nextDueAt: '2099-01-01',
+      }],
+    });
+    const handle = createRouter({
+      actions,
+      getOpenid: () => 'openid-a',
+      getRepo: () => repo,
+      logger: noopLogger,
+    });
+
+    await expect(handle({ action: 'member.me' })).resolves.toMatchObject({
+      ok: true,
+      data: { family: { _id: 'f1' }, member: { _id: 'm1' } },
+    });
+    await expect(handle({ action: 'chore.list' })).resolves.toMatchObject({
+      ok: true,
+      data: { chores: [{ _id: 'c1' }] },
+    });
+  });
+
   test('成功时返回 ok 与 data', async () => {
     const handle = build({ 'ping.do': async () => ({ pong: 1 }) });
     await expect(handle({ action: 'ping.do' })).resolves.toEqual({

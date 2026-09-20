@@ -50,6 +50,21 @@ describe('createFakeRepo', () => {
     expect(repo._state.families).toEqual([]);
   });
 
+  test('recordReminderSent 拒绝重复日期认领并可删除认领', async () => {
+    const repo = createFakeRepo({
+      reminderSends: [{ _id: 'r1', openid: 'openid-a', dateKey: '2026-09-17' }],
+    });
+
+    await expect(
+      repo.recordReminderSent({ openid: 'openid-a', dateKey: '2026-09-17' })
+    ).rejects.toMatchObject({
+      errCode: -502001,
+      message: expect.stringContaining('duplicate key error'),
+    });
+    await expect(repo.deleteReminderSend('openid-a', '2026-09-17')).resolves.toBe(true);
+    await expect(repo.deleteReminderSend('openid-a', '2026-09-17')).resolves.toBe(false);
+  });
+
   test('createChores 解构后仍可批量创建', async () => {
     const repo = createFakeRepo();
     const { createChores } = repo;

@@ -154,9 +154,27 @@ function createFakeRepo(seed = {}) {
       return state.reminderSends.some((r) => r.openid === openid && r.dateKey === dateKey);
     },
     async recordReminderSent(doc) {
+      if (
+        state.reminderSends.some(
+          (reminder) => reminder.openid === doc.openid && reminder.dateKey === doc.dateKey
+        )
+      ) {
+        throw duplicateKeyError(
+          'reminder_sends.openid_dateKey',
+          `${doc.openid}:${doc.dateKey}`
+        );
+      }
       const created = { _id: nextId('r'), ...doc };
       state.reminderSends.push(created);
       return clone(created);
+    },
+    async deleteReminderSend(openid, dateKey) {
+      const idx = state.reminderSends.findIndex(
+        (reminder) => reminder.openid === openid && reminder.dateKey === dateKey
+      );
+      if (idx === -1) return false;
+      state.reminderSends.splice(idx, 1);
+      return true;
     },
   };
 }

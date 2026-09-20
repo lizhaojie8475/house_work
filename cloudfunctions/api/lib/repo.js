@@ -169,6 +169,10 @@ function createRepo(db, command) {
       const { _id } = await col(COLLECTIONS.REMINDER_SENDS).add({ data: doc });
       return { _id, ...doc };
     },
+    async deleteReminderSend(openid, dateKey) {
+      const res = await col(COLLECTIONS.REMINDER_SENDS).where({ openid, dateKey }).remove();
+      return Boolean(res.stats && res.stats.removed > 0);
+    },
   };
 }
 

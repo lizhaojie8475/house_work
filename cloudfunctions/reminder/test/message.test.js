@@ -58,6 +58,14 @@ describe('buildTemplateData', () => {
     });
   });
 
+  test('待办数量 phrase 字段截断到 5 字符以内', () => {
+    const data = buildTemplateData(
+      { count: 123456, topChore: chore('拖地', '2026-09-15') },
+      today
+    );
+    expect(data.phrase2.value.length).toBeLessThanOrEqual(5);
+  });
+
   test('包含待办条数信息', () => {
     const summary = buildSummary(
       [chore('a', '2026-09-15'), chore('b', '2026-09-17')],
